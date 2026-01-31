@@ -1,4 +1,4 @@
 streamlit
 pandas
 requests
-apscheduler
+apscheduler==3.10.4
