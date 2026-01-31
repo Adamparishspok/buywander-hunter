@@ -1,5 +1,5 @@
 Request URL
-https://api.buywander.com/api/site/Auctions/list
+https://api.buywander.com/api/site/auction/list
 Request Method
 POST
 Status Code
@@ -37,7 +37,7 @@ api.buywander.com
 :method
 POST
 :path
-/api/site/Auctions/list
+/api/site/auction/list
 :scheme
 https
 accept

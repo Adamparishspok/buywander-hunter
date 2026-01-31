@@ -1,4 +1,4 @@
-To set up your custom querying and monitoring system for BuyWander auctions, we'll build on the API response data you provided. This looks like the JSON output from a backend call (likely captured via browser dev tools), which gives us a clear view of the request structure and response format. Based on common patterns for sites like this (Shopify with custom auction apps), the API appears to use a POST request with a JSON body for searching/filtering auctions. The endpoint is probably something like `https://buywander.com/api/auctions/search` or `https://buywander.com/api/auctions`—you'll need to confirm this by inspecting the Network tab in your browser while loading the page (filter for XHR/Fetch, look for a POST that returns similar JSON).
+To set up your custom querying and monitoring system for BuyWander auctions, we'll build on the API response data you provided. This looks like the JSON output from a backend call (likely captured via browser dev tools), which gives us a clear view of the request structure and response format. Based on common patterns for sites like this (Shopify with custom auction apps), the API appears to use a POST request with a JSON body for searching/filtering auctions. The endpoint is probably something like `https://buywander.com/api/auction/search` or `https://buywander.com/api/auctions`—you'll need to confirm this by inspecting the Network tab in your browser while loading the page (filter for XHR/Fetch, look for a POST that returns similar JSON).
 
 Key observations from your data:
 
@@ -18,7 +18,7 @@ import csv
 import time  # For delays to avoid rate limits
 
 # Hypothetical endpoint—confirm via dev tools (e.g., Network tab while loading page)
-base_url = "https://buywander.com/api/auctions/search"  # Or /api/auctions; test and adjust
+base_url = "https://buywander.com/api/auction/search"  # Or /api/auctions; test and adjust
 
 # Base request body from your data (customize as needed, e.g., change categories or sortBy)
 req_body = {
@@ -92,7 +92,7 @@ def monitor_deals():
                 retail = deal["item"].get("price", 0)
                 bid = deal.get("winningBid", {}).get("amount", 0)
                 end_date = deal.get("endDate", "N/A")
-                url = f"https://buywander.com/auctions/{deal['id']}"  # Assuming URL pattern; adjust
+                url = f"https://buywander.com/auction/{deal['id']}"  # Assuming URL pattern; adjust
                 writer.writerow([title, retail, bid, end_date, url])
 
         print(f"Found {len(deals)} deals! Saved to buywander_deals.csv")
