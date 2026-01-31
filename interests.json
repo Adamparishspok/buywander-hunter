@@ -1,0 +1,9 @@
+{
+    "Networking/Homelab": ["server", "switch", "router", "ubiquiti", "unifi", "cisco", "rack", "ethernet", "nas", "synology", "qnap", "patch panel"],
+    "Benz S550": ["mercedes", "benz", "s550", "w222"],
+    "Ram 1500": ["ram 1500", "dodge ram", "hemi"],
+    "Auto Tools": ["socket", "wrench", "jack", "diagnostic", "scanner", "milwaukee", "dewalt", "makita", "snap-on", "impact driver", "torque wrench"],
+    "Pool": ["pool", "pump", "filter", "skimmer", "chlorinator", "vacuum", "dolphin"],
+    "Headphones": ["headphone", "sony", "bose", "sennheiser", "audio-technica", "beyerdynamic", "focal", "hifiman"],
+    "Projectors": ["projector", "epson", "optoma", "benq", "sony", "jvc", "4k projector"]
+}

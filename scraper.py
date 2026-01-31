@@ -10,6 +10,8 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
+import os
+
 # Email Configuration - UPDATE THESE
 EMAIL_SENDER = "hello@atomparish.com"
 EMAIL_PASSWORD = "fVqGk3ZsL3479"  # Generate an App Password if using Gmail
@@ -20,8 +22,8 @@ SMTP_PORT = 587
 # Endpoint
 base_url = "https://api.buywander.com/api/site/auction/list"
 
-# Specific interests keywords
-INTERESTS = {
+# Default interests if JSON is missing
+DEFAULT_INTERESTS = {
     "Networking/Homelab": ["server", "switch", "router", "ubiquiti", "unifi", "cisco", "rack", "ethernet", "nas", "synology", "qnap", "patch panel"],
     "Benz S550": ["mercedes", "benz", "s550", "w222"],
     "Ram 1500": ["ram 1500", "dodge ram", "hemi"],
@@ -30,6 +32,18 @@ INTERESTS = {
     "Headphones": ["headphone", "sony", "bose", "sennheiser", "audio-technica", "beyerdynamic", "focal", "hifiman"],
     "Projectors": ["projector", "epson", "optoma", "benq", "sony", "jvc", "4k projector"]
 }
+
+def load_interests():
+    try:
+        if os.path.exists('interests.json'):
+            with open('interests.json', 'r') as f:
+                return json.load(f)
+    except Exception as e:
+        print(f"Error loading interests.json: {e}")
+    return DEFAULT_INTERESTS
+
+# Load interests dynamically
+INTERESTS = load_interests()
 
 # Categories to fetch (broad set to catch all interests)
 CATEGORIES = [
@@ -168,6 +182,10 @@ def send_email(items):
         print(f"Failed to send email: {e}")
 
 def monitor_deals():
+    # Reload interests to ensure we have the latest updates
+    global INTERESTS
+    INTERESTS = load_interests()
+    
     print("Fetching auctions...")
     auctions = fetch_all_auctions()
     print(f"Fetched {len(auctions)} auctions total")
