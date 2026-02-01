@@ -58,7 +58,7 @@ if check_password():
     # Sidebar for controls
     with st.sidebar:
         st.header("Controls")
-        if st.button("🔄 Run Scraper Now", type="primary"):
+        if st.button("🔄 Run Scraper", type="primary"):
             status_text = st.empty()
             progress_bar = st.progress(0)
             
@@ -133,4 +133,4 @@ if check_password():
             st.error(f"Error reading CSV file: {e}")
             st.warning("Try running the scraper again to regenerate the file.")
     else:
-        st.info("No data found yet. Click 'Run Scraper Now' in the sidebar to fetch deals.")
+        st.info("No data found yet. Click 'Run Scraper' in the sidebar to fetch deals.")

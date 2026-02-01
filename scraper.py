@@ -203,7 +203,7 @@ def monitor_deals():
         filename = 'buywander_interests.csv'
         with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
             writer = csv.writer(csvfile)
-            writer.writerow(['Interest Category', 'Title', 'Retail', 'Current Bid', 'Bids', 'End Date', 'URL', 'Image URL'])
+            writer.writerow(['Interest Category', 'Title', 'Retail', 'Current Bid', 'Bids', 'End Date', 'URL', 'Image URL', 'Deal Score'])
             
             for item in interesting_items:
                 title = item["item"].get("title", "N/A")
@@ -224,8 +224,16 @@ def monitor_deals():
                         image_url = first_image
                     elif isinstance(first_image, dict):
                         image_url = first_image.get("url", "")
+                
+                # Calculate Deal Score (0-100)
+                # Score = (Retail - Bid) / Retail * 100
+                # If Retail is 0 or missing, score is 0
+                deal_score = 0
+                if retail > 0:
+                    discount_percentage = ((retail - bid) / retail) * 100
+                    deal_score = round(max(0, min(100, discount_percentage)))
 
-                writer.writerow([interest, title, retail, bid, bids_count, end_date, url, image_url])
+                writer.writerow([interest, title, retail, bid, bids_count, end_date, url, image_url, deal_score])
         
         print(f"Found {len(interesting_items)} interesting items! Saved to {filename}")
         
