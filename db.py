@@ -18,7 +18,7 @@ def save_pull_history(pull_id, timestamp, status, items_found, error=None, user_
     try:
         with conn.cursor() as cur:
             cur.execute(
-                \"\"\"
+                """
                 INSERT INTO scrape_history (pull_id, timestamp, status, items_found, error, user_id)
                 VALUES (%s, %s, %s, %s, %s, %s)
                 ON CONFLICT (pull_id) DO UPDATE
@@ -27,7 +27,7 @@ def save_pull_history(pull_id, timestamp, status, items_found, error=None, user_
                     items_found = EXCLUDED.items_found,
                     error = EXCLUDED.error,
                     user_id = EXCLUDED.user_id
-                \"\"\",
+                """,
                 (pull_id, timestamp, status, items_found, error, user_id),
             )
         conn.commit()
@@ -80,23 +80,23 @@ def load_history(user_id=None):
         with conn.cursor() as cur:
             if user_id:
                 cur.execute(
-                    \"\"\"
+                    """
                     SELECT pull_id, timestamp, status, items_found, error
                     FROM scrape_history
                     WHERE user_id = %s OR user_id IS NULL
                     ORDER BY pull_id DESC
                     LIMIT 50
-                    \"\"\",
+                    """,
                     (user_id,)
                 )
             else:
                 cur.execute(
-                    \"\"\"
+                    """
                     SELECT pull_id, timestamp, status, items_found, error
                     FROM scrape_history
                     ORDER BY pull_id DESC
                     LIMIT 50
-                    \"\"\"
+                    """
                 )
             rows = cur.fetchall()
             return [
@@ -153,24 +153,24 @@ def get_latest_pull(user_id=None):
         with conn.cursor() as cur:
             if user_id:
                 cur.execute(
-                    \"\"\"
+                    """
                     SELECT pull_id, timestamp, items_found
                     FROM scrape_history
                     WHERE status = 'success' AND (user_id = %s OR user_id IS NULL)
                     ORDER BY pull_id DESC
                     LIMIT 1
-                    \"\"\",
+                    """,
                     (user_id,)
                 )
             else:
                 cur.execute(
-                    \"\"\"
+                    """
                     SELECT pull_id, timestamp, items_found
                     FROM scrape_history
                     WHERE status = 'success'
                     ORDER BY pull_id DESC
                     LIMIT 1
-                    \"\"\"
+                    """
                 )
             row = cur.fetchone()
             if not row:
