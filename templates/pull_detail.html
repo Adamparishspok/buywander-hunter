@@ -14,9 +14,82 @@
             ::-webkit-scrollbar-track { background: #09090b; }
             ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 4px; }
             ::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+
+            /* Line clamp utility for text truncation */
+            .line-clamp-2 {
+                overflow: hidden;
+                display: -webkit-box;
+                -webkit-box-orient: vertical;
+                -webkit-line-clamp: 2;
+            }
+
+            /* Hide view containers by default, show active one */
+            .view-container {
+                display: block;
+            }
+
+            .view-container.hidden {
+                display: none;
+            }
         </style>
     </head>
     <body class="bg-black text-zinc-400 antialiased h-screen w-full flex overflow-hidden selection:bg-indigo-500/30 selection:text-indigo-200">
+        <!-- Mobile Menu Overlay -->
+        <div id="mobileMenu" class="fixed inset-0 bg-black/95 backdrop-blur-sm z-50 md:hidden hidden">
+            <div class="flex flex-col h-full">
+                <!-- Mobile Menu Header -->
+                <div class="flex items-center justify-between px-6 py-5 border-b border-zinc-800">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2.5 bg-indigo-500/10 rounded-lg border border-indigo-500/20">
+                            <i data-lucide="shopping-cart" class="text-indigo-400 w-6 h-6"></i>
+                        </div>
+                        <span class="font-medium text-xl tracking-tight text-zinc-100">Deal Hunter</span>
+                    </div>
+                    <button id="closeMobileMenu" class="p-3 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-lg transition-colors">
+                        <i data-lucide="x" class="w-7 h-7"></i>
+                    </button>
+                </div>
+
+                <!-- Mobile Menu Content -->
+                <div class="flex-1 px-6 py-8 space-y-8">
+                    <!-- Pull Products Button -->
+                    <button type="button" id="mobileScrapeButton" onclick="startPull()"
+                            class="w-full group relative flex items-center justify-center gap-3 bg-gradient-to-b from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white px-6 py-4 rounded-xl shadow-[0_0_0_1px_rgba(225,29,72,1),0_1px_2px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.15)] transition-all duration-200 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed">
+                        <i data-lucide="download" class="w-5 h-5"></i>
+                        <span class="font-medium text-base" id="mobileScrapeText">Pull Products</span>
+                    </button>
+
+                    <!-- Navigation Links -->
+                    <div class="space-y-3">
+                        <a href="/" class="w-full flex items-center gap-4 px-4 py-4 text-base text-zinc-300 bg-zinc-900/50 rounded-xl border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800 transition-colors">
+                            <i data-lucide="home" class="w-5 h-5 text-zinc-500"></i>
+                            Home
+                        </a>
+                        <a href="/settings" class="w-full flex items-center gap-4 px-4 py-4 text-base text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50 rounded-xl transition-colors">
+                            <i data-lucide="settings-2" class="w-5 h-5 text-zinc-500"></i>
+                            Configuration
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Mobile Menu Footer -->
+                <div class="px-6 py-5 border-t border-zinc-800 bg-zinc-950">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center">
+                            <span class="text-sm font-medium text-zinc-300">{{ user.initials }}</span>
+                        </div>
+                        <div class="flex flex-col flex-1">
+                            <span class="text-base font-medium text-zinc-200">{{ user.display_name }}</span>
+                            <span class="text-sm text-zinc-500">Deal Hunter</span>
+                        </div>
+                        <a href="/logout" class="p-3 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors" title="Logout">
+                            <i data-lucide="log-out" class="w-5 h-5"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Sidebar -->
         <aside class="w-72 bg-zinc-950 border-r border-zinc-800/60 hidden md:flex flex-col justify-between flex-shrink-0 relative z-20">
             <div class="p-6 space-y-8">
@@ -62,7 +135,20 @@
 
         <!-- Main Content -->
         <main class="flex-1 flex flex-col h-full bg-black relative overflow-hidden">
-            <header class="flex-shrink-0 border-b border-zinc-800/60 bg-black/50 backdrop-blur-xl z-10">
+            <!-- Mobile Header -->
+            <header class="md:hidden flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-zinc-950 z-30">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 bg-indigo-500/10 rounded-lg border border-indigo-500/20">
+                        <i data-lucide="shopping-cart" class="text-indigo-400 w-5 h-5"></i>
+                    </div>
+                    <span class="font-medium text-base tracking-tight text-zinc-100">Deal Hunter</span>
+                </div>
+                <button id="openMobileMenu" class="p-3 text-zinc-400 hover:text-zinc-200 transition-colors rounded-lg hover:bg-zinc-800">
+                    <i data-lucide="menu" class="w-6 h-6"></i>
+                </button>
+            </header>
+
+            <header class="flex-shrink-0 border-b border-zinc-800/60 bg-black/50 backdrop-blur-xl z-10 hidden md:flex">
                 <div class="max-w-7xl mx-auto px-6 py-6 md:py-8">
                     <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
                         <div>
@@ -84,7 +170,7 @@
                 </div>
             </header>
 
-            <div class="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar">
+            <div class="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
                 <div class="max-w-7xl mx-auto space-y-8">
                     {% if deals %}
                     <!-- Filter Bar -->
@@ -120,12 +206,33 @@
                         </div>
                     </section>
 
+                    <!-- View Toggle -->
+                    <section class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <button id="listViewBtn"
+                                    class="flex items-center gap-2 px-3 py-2 text-sm bg-zinc-800 text-zinc-200 rounded-lg hover:bg-zinc-700 transition-colors">
+                                <i data-lucide="list" class="w-4 h-4"></i>
+                                List
+                            </button>
+                            <button id="gridViewBtn"
+                                    class="flex items-center gap-2 px-3 py-2 text-sm text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-lg transition-colors">
+                                <i data-lucide="grid" class="w-4 h-4"></i>
+                                Grid
+                            </button>
+                        </div>
+                        <div class="text-sm text-zinc-500">
+                            {{ deals|length }} products
+                        </div>
+                    </section>
+
                     <!-- Data Table -->
+                    <div id="listView" class="view-container">
                     <section class="border border-zinc-800 rounded-xl bg-zinc-900/20 overflow-hidden shadow-sm">
                         <div class="overflow-x-auto">
                             <table class="min-w-full text-left border-collapse">
                                 <thead>
                                     <tr class="border-b border-zinc-800/80 bg-zinc-900/40">
+                                        <th class="px-6 py-4 text-xs font-medium uppercase tracking-wider text-zinc-500 w-[80px]">Image</th>
                                         <th class="px-6 py-4 text-xs font-medium uppercase tracking-wider text-zinc-500 w-[140px]">Category</th>
                                         <th class="px-6 py-4 text-xs font-medium uppercase tracking-wider text-zinc-500">Title</th>
                                         <th class="px-6 py-4 text-xs font-medium uppercase tracking-wider text-zinc-500 text-right">Retail</th>
@@ -138,6 +245,17 @@
                                 <tbody class="divide-y divide-zinc-800/60 text-sm" id="dealsTableBody">
                                     {% for row in deals %}
                                     <tr class="group hover:bg-zinc-800/30 transition-colors deal-row">
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            {% if row['Image URL'] %}
+                                                <img src="{{ row['Image URL'] }}" alt="{{ row['Title'] }}"
+                                                     class="w-12 h-12 object-cover rounded-lg border border-zinc-700 bg-zinc-800"
+                                                     onerror="this.style.display='none'">
+                                            {% else %}
+                                                <div class="w-12 h-12 rounded-lg border border-zinc-700 bg-zinc-800 flex items-center justify-center">
+                                                    <i data-lucide="image" class="w-6 h-6 text-zinc-600"></i>
+                                                </div>
+                                            {% endif %}
+                                        </td>
                                         <td class="px-6 py-4 whitespace-nowrap">
                                             <div class="inline-flex items-center px-2 py-1 rounded border border-zinc-700 bg-zinc-800/50 text-xs font-medium text-zinc-300">{{ row['Interest Category'] }}</div>
                                         </td>
@@ -174,6 +292,69 @@
                             <span class="text-xs text-zinc-500">Showing {{ deals|length }} entries</span>
                         </div>
                     </section>
+                    </div>
+
+                    <!-- Grid View -->
+                    <div id="gridView" class="view-container hidden">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                            {% for row in deals %}
+                            <div class="deal-card group border border-zinc-800 rounded-xl bg-zinc-900/20 p-4 hover:border-zinc-700 transition-all cursor-pointer" onclick="window.open('{{ row['URL'] }}', '_blank')">
+                                <!-- Product Image -->
+                                <div class="aspect-square mb-3 overflow-hidden rounded-lg bg-zinc-800">
+                                    {% if row['Image URL'] %}
+                                        <img src="{{ row['Image URL'] }}" alt="{{ row['Title'] }}"
+                                             class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+                                        <div class="w-full h-full hidden items-center justify-center">
+                                            <i data-lucide="image" class="w-12 h-12 text-zinc-600"></i>
+                                        </div>
+                                    {% else %}
+                                        <div class="w-full h-full flex items-center justify-center">
+                                            <i data-lucide="image" class="w-12 h-12 text-zinc-600"></i>
+                                        </div>
+                                    {% endif %}
+                                </div>
+
+                                <!-- Product Info -->
+                                <div class="space-y-2">
+                                    <!-- Category Badge -->
+                                    <div class="inline-flex items-center px-2 py-1 rounded border border-zinc-700 bg-zinc-800/50 text-xs font-medium text-zinc-300">
+                                        {{ row['Interest Category'] }}
+                                    </div>
+
+                                    <!-- Title -->
+                                    <h3 class="text-sm font-medium text-zinc-200 line-clamp-2 group-hover:text-indigo-400 transition-colors" title="{{ row['Title'] }}">
+                                        {{ row['Title'] }}
+                                    </h3>
+
+                                    <!-- Price Info -->
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex flex-col">
+                                            <span class="text-lg font-bold text-emerald-400">${{ row['Current Bid'] }}</span>
+                                            {% if row['Retail'] %}
+                                            <span class="text-xs text-zinc-500 line-through">${{ row['Retail'] }}</span>
+                                            {% endif %}
+                                        </div>
+                                        {% if row['Deal Score'] %}
+                                            {% set score = row['Deal Score']|int %}
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {% if score >= 90 %}bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 {% elif score >= 70 %}bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 {% elif score >= 50 %}bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 {% else %}bg-zinc-800 text-zinc-400 border border-zinc-700{% endif %}">{{ score }}%</span>
+                                        {% endif %}
+                                    </div>
+
+                                    <!-- Additional Info -->
+                                    <div class="flex items-center justify-between text-xs text-zinc-500">
+                                        <span>{{ row['Bids'] }} bids</span>
+                                        <div class="flex items-center gap-1">
+                                            <i data-lucide="clock" class="w-3 h-3 text-orange-500"></i>
+                                            <span class="text-orange-400/90">{{ row['End Date'] }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
                     {% else %}
                     <div class="text-center py-16 border border-dashed border-zinc-800 rounded-xl">
                         <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-zinc-900/50 border border-zinc-800 mb-4">
@@ -195,6 +376,33 @@
         <script>
             lucide.createIcons();
 
+            // --- Mobile Menu ---
+            const mobileMenu = document.getElementById('mobileMenu');
+            const openMobileMenu = document.getElementById('openMobileMenu');
+            const closeMobileMenu = document.getElementById('closeMobileMenu');
+
+            function toggleMobileMenu() {
+                mobileMenu.classList.toggle('hidden');
+                document.body.style.overflow = mobileMenu.classList.contains('hidden') ? '' : 'hidden';
+            }
+
+            openMobileMenu?.addEventListener('click', toggleMobileMenu);
+            closeMobileMenu?.addEventListener('click', toggleMobileMenu);
+
+            // Close mobile menu when clicking on a link
+            mobileMenu?.addEventListener('click', (e) => {
+                if (e.target.tagName === 'A') {
+                    toggleMobileMenu();
+                }
+            });
+
+            // Close mobile menu on escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && !mobileMenu.classList.contains('hidden')) {
+                    toggleMobileMenu();
+                }
+            });
+
             // Pull Products redirects to dashboard
             function startPull() {
                 fetch("/scrape", { method: "POST" })
@@ -206,7 +414,13 @@
             }
 
             // Search & filter
-            document.getElementById("searchInput").addEventListener("keyup", filterTable);
+            document.getElementById("searchInput").addEventListener("keyup", () => {
+                if (currentView === 'list') {
+                    filterTable();
+                } else {
+                    filterGrid();
+                }
+            });
 
             const dropdownBtn = document.getElementById("filterDropdownBtn");
             const dropdownMenu = document.getElementById("filterDropdownMenu");
@@ -231,7 +445,14 @@
                 filterLabel.textContent = category === "all" ? "Interest Category" : category;
                 dropdownMenu.classList.add("hidden");
                 chevron.classList.remove("rotate-180");
-                filterTable();
+
+                // Apply filter based on current view
+                if (currentView === 'list') {
+                    filterTable();
+                } else {
+                    filterGrid();
+                }
+
                 lucide.createIcons();
             }
 
@@ -239,11 +460,59 @@
                 const searchFilter = document.getElementById("searchInput").value.toLowerCase();
                 const rows = document.querySelectorAll(".deal-row");
                 rows.forEach((row) => {
-                    const title = (row.querySelector("td:nth-child(2) a") || {}).textContent || "";
-                    const category = (row.querySelector("td:nth-child(1) div") || {}).textContent.trim();
+                    const title = (row.querySelector("td:nth-child(3) a") || {}).textContent || "";
+                    const category = (row.querySelector("td:nth-child(2) div") || {}).textContent.trim();
                     const matchesSearch = title.toLowerCase().includes(searchFilter);
                     const matchesCategory = currentCategory === "all" || category === currentCategory;
                     row.style.display = matchesSearch && matchesCategory ? "" : "none";
+                });
+            }
+
+            // --- View Switching ---
+            const listViewBtn = document.getElementById('listViewBtn');
+            const gridViewBtn = document.getElementById('gridViewBtn');
+            const listView = document.getElementById('listView');
+            const gridView = document.getElementById('gridView');
+
+            // Set default view (list)
+            let currentView = 'list';
+
+            function switchToListView() {
+                listView.classList.remove('hidden');
+                gridView.classList.add('hidden');
+                listViewBtn.classList.add('bg-zinc-800', 'text-zinc-200');
+                listViewBtn.classList.remove('text-zinc-400');
+                gridViewBtn.classList.remove('bg-zinc-800', 'text-zinc-200');
+                gridViewBtn.classList.add('text-zinc-400');
+                currentView = 'list';
+                // Re-apply current filters
+                filterTable();
+            }
+
+            function switchToGridView() {
+                listView.classList.add('hidden');
+                gridView.classList.remove('hidden');
+                gridViewBtn.classList.add('bg-zinc-800', 'text-zinc-200');
+                gridViewBtn.classList.remove('text-zinc-400');
+                listViewBtn.classList.remove('bg-zinc-800', 'text-zinc-200');
+                listViewBtn.classList.add('text-zinc-400');
+                currentView = 'grid';
+                // Apply grid filtering
+                filterGrid();
+            }
+
+            listViewBtn.addEventListener('click', switchToListView);
+            gridViewBtn.addEventListener('click', switchToGridView);
+
+            function filterGrid() {
+                const searchFilter = document.getElementById("searchInput").value.toLowerCase();
+                const cards = document.querySelectorAll(".deal-card");
+                cards.forEach((card) => {
+                    const title = (card.querySelector("h3") || {}).textContent || "";
+                    const category = (card.querySelector("div.inline-flex") || {}).textContent.trim();
+                    const matchesSearch = title.toLowerCase().includes(searchFilter);
+                    const matchesCategory = currentCategory === "all" || category === currentCategory;
+                    card.style.display = matchesSearch && matchesCategory ? "" : "none";
                 });
             }
         </script>

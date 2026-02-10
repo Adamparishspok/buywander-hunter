@@ -3,11 +3,13 @@
 This app now supports multiple user accounts. Here are the default credentials:
 
 ## Adam's Account
+
 - **Username:** `Adam`
 - **Password:** `adam123`
 - **Initials:** AP
 
 ## Alex's Account
+
 - **Username:** `Alex`
 - **Password:** `alex123`
 - **Initials:** AP
@@ -19,6 +21,7 @@ To change passwords, you can edit the `users.json` file that will be created whe
 The passwords are hashed using SHA256, so if you want to set a new password:
 
 1. Generate a hash using Python:
+
 ```python
 import hashlib
 password = "your_new_password"

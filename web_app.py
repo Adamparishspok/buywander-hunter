@@ -16,6 +16,14 @@ from flask import (
     url_for,
 )
 
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # python-dotenv not installed, continue without .env loading
+    pass
+
 import scraper
 import db
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -43,14 +51,14 @@ def scheduled_scrape_job():
     # Iterate over all users and run scrape for each
     users = load_users()
     for username in users:
-        print(f"Starting scheduled scrape for {username}...")
+        print("Starting scheduled scrape for {}...".format(username))
         # Create a unique pull ID
-        pull_id = datetime.now().strftime("%Y%m%d_%H%M%S") + f"_{username}"
+        pull_id = datetime.now().strftime("%Y%m%d_%H%M%S") + "_{}".format(username)
         
         # Check if already running for this user
         state = load_scrape_state(username=username)
         if state.get("running"):
-            print(f"Skipping scheduled scrape for {username}: Scraper already running.")
+            print("Skipping scheduled scrape for {}: Scraper already running.".format(username))
             continue
 
         # Set state
@@ -70,6 +78,19 @@ def scheduled_scrape_job():
         # But for 2 users, it's fine.
         _run_scraper_task(pull_id, username=username, user_interests=user_interests)
 
+
+def scheduled_cleanup_job():
+    """Job to clean up old scrape data (older than 2 days)."""
+    print("Running scheduled cleanup of old scrape data...")
+    try:
+        import db
+        result = db.cleanup_old_scrapes(days_old=2)
+        print("Cleanup completed: deleted {} history entries and {} items older than {} days".format(
+            result["history_deleted"], result["items_deleted"], result["days_old"]
+        ))
+    except Exception as e:
+        print("Error during cleanup: {}".format(e))
+
 def load_schedule():
     """Load schedule configuration."""
     if os.path.exists(SCHEDULE_FILE):
@@ -88,6 +109,18 @@ def save_schedule(config):
         
         # Update scheduler
         scheduler.remove_all_jobs()
+
+        # Always schedule cleanup job (daily at 2:00 AM)
+        scheduler.add_job(
+            func=scheduled_cleanup_job,
+            trigger="cron",
+            hour=2,
+            minute=0,
+            id="daily_cleanup",
+            replace_existing=True
+        )
+        print("Scheduled daily cleanup for 2:00 AM.")
+
         if config.get("enabled"):
             # Schedule for 6:00 PM (18:00) daily
             scheduler.add_job(
@@ -104,11 +137,28 @@ def save_schedule(config):
             
         return True
     except Exception as e:
-        print(f"Error saving schedule: {e}")
+        print("Error saving schedule: {}".format(e))
         return False
 
 # Initialize schedule on startup
 save_schedule(load_schedule())
+
+# Run initial cleanup on startup (in background)
+def startup_cleanup():
+    """Run cleanup on startup to remove any existing old data."""
+    try:
+        import db
+        result = db.cleanup_old_scrapes(days_old=2)
+        print("Startup cleanup completed: deleted {} history entries and {} items".format(
+            result["history_deleted"], result["items_deleted"]
+        ))
+    except Exception as e:
+        print("Error during startup cleanup: {}".format(e))
+
+# Run cleanup in background thread to avoid blocking startup
+import threading
+cleanup_thread = threading.Thread(target=startup_cleanup, daemon=True)
+cleanup_thread.start()
 
 
 # --- Scrape state (file-based, survives restarts) ---
@@ -142,7 +192,7 @@ def save_scrape_state(state, username=None):
             with open(SCRAPE_STATE_FILE, "w") as f:
                 json.dump(all_states, f)
     except Exception as e:
-        print(f"Error saving scrape state: {e}")
+        print("Error saving scrape state: {}".format(e))
 
 
 # On startup: if state says "running" but no thread is alive, mark it failed
@@ -171,7 +221,7 @@ if os.path.exists(SCRAPE_STATE_FILE):
             _updated = False
             for _user, _state in _all_states.items():
                 if isinstance(_state, dict) and _state.get("running"):
-                    print(f"Previous scrape for {_user} was interrupted. Marking as failed.")
+                    print("Previous scrape for {} was interrupted. Marking as failed.".format(_user))
                     _state["running"] = False
                     _state["message"] = "Interrupted by server restart"
                     _updated = True
@@ -209,7 +259,7 @@ def load_users():
             with open(USERS_FILE, "r") as f:
                 return json.load(f)
         except Exception as e:
-            print(f"Error loading users: {e}")
+            print("Error loading users: {}".format(e))
 
     default_users = {
         "Adam": {
@@ -233,7 +283,7 @@ def save_users(users):
             json.dump(users, f, indent=4)
         return True
     except Exception as e:
-        print(f"Error saving users: {e}")
+        print("Error saving users: {}".format(e))
         return False
 
 
@@ -254,7 +304,7 @@ def load_interests(username=None):
                     return all_interests.get(username, {})
                 return all_interests
         except Exception as e:
-            print(f"Error loading interests: {e}")
+            print("Error loading interests: {}".format(e))
     return {}
 
 
@@ -281,7 +331,7 @@ def save_interests(interests, username=None):
             json.dump(all_interests, f, indent=4)
         return True
     except Exception as e:
-        print(f"Error saving interests: {e}")
+        print("Error saving interests: {}".format(e))
         return False
 
 
@@ -305,7 +355,7 @@ def login():
             users = load_users()
             session["display_name"] = users[username]["display_name"]
             session["initials"] = users[username]["initials"]
-            flash(f'Welcome back, {session["display_name"]}!', "success")
+            flash('Welcome back, {}!'.format(session["display_name"]), "success")
             return redirect(url_for("index"))
         else:
             flash("Invalid credentials.", "error")
@@ -329,7 +379,7 @@ def index():
     try:
         scrape_history = db.load_history(user_id=session.get("username"))
     except Exception as e:
-        print(f"Error loading history from DB: {e}")
+        print("Error loading history from DB: {}".format(e))
         scrape_history = []
         flash("Error loading history from database.", "error")
     
@@ -345,14 +395,14 @@ def _run_scraper_task(pull_id, username=None, user_interests=None):
         state = load_scrape_state(username=username)
         state["message"] = "Fetching auctions from BuyWander..."
         save_scrape_state(state, username=username)
-        print(f"Starting scraper for pull {pull_id}...")
+        print("Starting scraper for pull {}...".format(pull_id))
 
         # Run the scraper - it returns a list of items
         # If user_interests is provided, use it. Otherwise, scraper might load default (or we should pass empty)
         items = scraper.monitor_deals(interests=user_interests)
 
         items_count = len(items)
-        print(f"Scraper done. Found {items_count} items for pull {pull_id}.")
+        print("Scraper done. Found {} items for pull {}.".format(items_count, pull_id))
 
         # Save to database
         timestamp = datetime.now().strftime("%b %d, %Y - %I:%M %p")
@@ -361,12 +411,12 @@ def _run_scraper_task(pull_id, username=None, user_interests=None):
             db.save_pull_items(pull_id, items)
 
         state = load_scrape_state(username=username)
-        state["message"] = f"Done! Found {items_count} products."
+        state["message"] = "Done! Found {} products.".format(items_count)
         state["items_found"] = items_count
         state["running"] = False
         save_scrape_state(state, username=username)
     except Exception as e:
-        print(f"Error in scraper: {e}")
+        print("Error in scraper: {}".format(e))
         import traceback
         traceback.print_exc()
 
@@ -374,7 +424,7 @@ def _run_scraper_task(pull_id, username=None, user_interests=None):
         db.save_pull_history(pull_id, timestamp, "error", 0, str(e), user_id=username)
 
         state = load_scrape_state(username=username)
-        state["message"] = f"Error: {e}"
+        state["message"] = "Error: {}".format(e)
         state["running"] = False
         save_scrape_state(state, username=username)
 
@@ -413,6 +463,26 @@ def scrape_progress():
     return jsonify(state)
 
 
+@app.route("/cleanup", methods=["POST"])
+@login_required
+def manual_cleanup():
+    """Manually trigger cleanup of old scrape data (admin function)."""
+    try:
+        import db
+        result = db.cleanup_old_scrapes(days_old=2)
+        message = "Cleanup completed: deleted {} history entries and {} items older than {} days".format(
+            result["history_deleted"], result["items_deleted"], result["days_old"]
+        )
+        print(message)
+        flash(message, "success")
+    except Exception as e:
+        error_msg = "Cleanup failed: {}".format(e)
+        print(error_msg)
+        flash(error_msg, "error")
+
+    return redirect(url_for("index"))
+
+
 # --- Settings ---
 @app.route("/settings")
 @login_required
@@ -433,7 +503,7 @@ def update_schedule():
     config = {"enabled": enabled}
     if save_schedule(config):
         status = "enabled" if enabled else "disabled"
-        flash(f"Nightly scan {status}.", "success")
+        flash("Nightly scan {}.".format(status), "success")
     else:
         flash("Error saving schedule settings.", "error")
         
@@ -452,7 +522,7 @@ def add_interest():
         interests = load_interests(username=username)
         interests[category] = keywords
         if save_interests(interests, username=username):
-            flash(f"Added interest category: {category}", "success")
+            flash("Added interest category: {}".format(category), "success")
         else:
             flash("Error saving interest.", "error")
     else:
@@ -471,7 +541,7 @@ def delete_interest():
         if category in interests:
             del interests[category]
             if save_interests(interests, username=username):
-                flash(f"Deleted interest category: {category}", "success")
+                flash("Deleted interest category: {}".format(category), "success")
             else:
                 flash("Error saving changes.", "error")
         else:
@@ -508,7 +578,7 @@ def pull_detail(pull_id):
         entry = next((e for e in history if e.get("pull_id") == pull_id), None)
         pull_name = entry["timestamp"] if entry else pull_id
     except Exception as e:
-        print(f"Error loading pull {pull_id}: {e}")
+        print("Error loading pull {}: {}".format(pull_id, e))
         deals = []
         pull_name = pull_id
         flash("Error loading pull data from database.", "error")

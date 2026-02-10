@@ -2,6 +2,7 @@
 import os
 import psycopg2
 from psycopg2.extras import execute_batch
+from datetime import datetime, timedelta
 
 
 def get_connection():
@@ -185,5 +186,54 @@ def get_latest_pull(user_id=None):
             
             items = load_pull_items(pull_id)
             return entry, items
+    finally:
+        conn.close()
+
+
+def cleanup_old_scrapes(days_old=2):
+    """Delete scrape runs and their items older than the specified number of days.
+
+    Args:
+        days_old (int): Number of days old to consider for deletion (default: 2)
+
+    Returns:
+        dict: Summary of cleanup operations with counts of deleted items
+    """
+    cutoff_date = datetime.now() - timedelta(days=days_old)
+
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            # First, delete pull items for old scrapes
+            cur.execute(
+                """
+                DELETE FROM pull_items
+                WHERE pull_id IN (
+                    SELECT pull_id FROM scrape_history
+                    WHERE timestamp < %s
+                )
+                """,
+                (cutoff_date,)
+            )
+            items_deleted = cur.rowcount
+
+            # Then delete the scrape history entries
+            cur.execute(
+                """
+                DELETE FROM scrape_history
+                WHERE timestamp < %s
+                """,
+                (cutoff_date,)
+            )
+            history_deleted = cur.rowcount
+
+        conn.commit()
+
+        return {
+            "items_deleted": items_deleted,
+            "history_deleted": history_deleted,
+            "cutoff_date": cutoff_date.isoformat(),
+            "days_old": days_old
+        }
     finally:
         conn.close()

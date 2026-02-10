@@ -6,6 +6,7 @@ import os
 import random
 import smtplib
 import time
+from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -17,6 +18,27 @@ EMAIL_PASSWORD = "fVqGk3ZsL3479"  # Generate an App Password if using Gmail
 EMAIL_RECEIVER = "hello@atomparish.com"
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
+
+
+def format_auction_date(date_string):
+    """Format auction end date to a readable format in local timezone."""
+    if not date_string or date_string == "N/A":
+        return "N/A"
+
+    try:
+        # Parse ISO 8601 date string (e.g., "2026-02-12T03:18:00+00:00")
+        dt_utc = datetime.fromisoformat(date_string.replace('Z', '+00:00'))
+
+        # Convert to local timezone
+        dt_local = dt_utc.astimezone()
+
+        # Format as readable string (e.g., "Feb 12, 3:18 PM")
+        return dt_local.strftime("%b %d, %I:%M %p")
+
+    except (ValueError, AttributeError):
+        # If parsing fails, return the original string
+        return date_string
+
 
 # Endpoint
 base_url = "https://api.buywander.com/api/site/Auctions/list"
@@ -272,7 +294,8 @@ def monitor_deals(interests=None):
         winning_bid = item.get("winningBid")
         bid = winning_bid.get("amount", 0) if winning_bid else 0
         bids_count = winning_bid.get("bids", 0) if winning_bid else 0
-        end_date = item.get("endDate", "N/A")
+        end_date_raw = item.get("endDate", "N/A")
+        end_date = format_auction_date(end_date_raw)
         url = f"https://buywander.com/auction/{item['id']}"
         interest = item.get("interest_category", "Unknown")
 
