@@ -18,6 +18,8 @@ from flask import (
 
 import scraper
 import db
+from apscheduler.schedulers.background import BackgroundScheduler
+import atexit
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "supersecretkey")
@@ -26,6 +28,77 @@ app.secret_key = os.environ.get("SECRET_KEY", "supersecretkey")
 INTERESTS_FILE = "interests.json"
 USERS_FILE = "users.json"
 SCRAPE_STATE_FILE = "scrape_state.json"
+SCHEDULE_FILE = "schedule.json"
+
+
+# --- Scheduler ---
+scheduler = BackgroundScheduler()
+scheduler.start()
+atexit.register(lambda: scheduler.shutdown())
+
+def scheduled_scrape_job():
+    """Job to run the scraper on schedule."""
+    print("Running scheduled nightly scrape...")
+    # Create a unique pull ID
+    pull_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    # Check if already running
+    state = load_scrape_state()
+    if state.get("running"):
+        print("Skipping scheduled scrape: Scraper already running.")
+        return
+
+    # Set state
+    state = {
+        "running": True,
+        "message": "Starting scheduled scrape...",
+        "items_found": 0,
+        "pull_id": pull_id,
+    }
+    save_scrape_state(state)
+    
+    # Run task directly (we are already in a background thread from scheduler)
+    _run_scraper_task(pull_id)
+
+def load_schedule():
+    """Load schedule configuration."""
+    if os.path.exists(SCHEDULE_FILE):
+        try:
+            with open(SCHEDULE_FILE, "r") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {"enabled": False}
+
+def save_schedule(config):
+    """Save schedule configuration and update scheduler."""
+    try:
+        with open(SCHEDULE_FILE, "w") as f:
+            json.dump(config, f)
+        
+        # Update scheduler
+        scheduler.remove_all_jobs()
+        if config.get("enabled"):
+            # Schedule for 6:00 PM (18:00) daily
+            scheduler.add_job(
+                func=scheduled_scrape_job,
+                trigger="cron",
+                hour=18,
+                minute=0,
+                id="nightly_scrape",
+                replace_existing=True
+            )
+            print("Scheduled nightly scrape for 6:00 PM.")
+        else:
+            print("Nightly scrape disabled.")
+            
+        return True
+    except Exception as e:
+        print(f"Error saving schedule: {e}")
+        return False
+
+# Initialize schedule on startup
+save_schedule(load_schedule())
 
 
 # --- Scrape state (file-based, survives restarts) ---
@@ -269,8 +342,26 @@ def scrape_progress():
 @login_required
 def settings():
     return render_template(
-        "settings.html", interests=load_interests(), user=get_user_info()
+        "settings.html", 
+        interests=load_interests(), 
+        user=get_user_info(),
+        schedule=load_schedule()
     )
+
+
+@app.route("/settings/schedule", methods=["POST"])
+@login_required
+def update_schedule():
+    enabled = request.form.get("nightly_scan") == "true"
+    
+    config = {"enabled": enabled}
+    if save_schedule(config):
+        status = "enabled" if enabled else "disabled"
+        flash(f"Nightly scan {status}.", "success")
+    else:
+        flash("Error saving schedule settings.", "error")
+        
+    return redirect(url_for("settings"))
 
 
 @app.route("/settings/add", methods=["POST"])
