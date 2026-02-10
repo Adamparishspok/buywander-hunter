@@ -182,22 +182,14 @@ def logout():
 @login_required
 def index():
     try:
-        latest_entry, deals = db.get_latest_pull()
-        last_updated = latest_entry["timestamp"] if latest_entry else "Never"
+        scrape_history = db.load_history()
     except Exception as e:
-        print(f"Error loading latest pull from DB: {e}")
-        deals = []
-        last_updated = "Error loading data"
+        print(f"Error loading history from DB: {e}")
+        scrape_history = []
+        flash("Error loading history from database.", "error")
     
-    categories = sorted(list(set(d.get("Interest Category", "Unknown") for d in deals)))
-
     return render_template(
-        "index.html",
-        deals=deals,
-        last_updated=last_updated,
-        total_items=len(deals),
-        categories=categories,
-        user=get_user_info(),
+        "index.html", history=scrape_history, user=get_user_info()
     )
 
 
@@ -320,19 +312,19 @@ def delete_interest():
 
 
 # --- History ---
-@app.route("/history")
-@login_required
-def history():
-    try:
-        scrape_history = db.load_history()
-    except Exception as e:
-        print(f"Error loading history from DB: {e}")
-        scrape_history = []
-        flash("Error loading history from database.", "error")
-    
-    return render_template(
-        "history.html", history=scrape_history, user=get_user_info()
-    )
+# @app.route("/history") - Moved to index
+# @login_required
+# def history():
+#     try:
+#         scrape_history = db.load_history()
+#     except Exception as e:
+#         print(f"Error loading history from DB: {e}")
+#         scrape_history = []
+#         flash("Error loading history from database.", "error")
+#     
+#     return render_template(
+#         "history.html", history=scrape_history, user=get_user_info()
+#     )
 
 
 @app.route("/pull/<pull_id>")
