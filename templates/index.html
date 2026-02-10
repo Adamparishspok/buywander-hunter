@@ -14,18 +14,22 @@
       body {
         font-family: "Inter", sans-serif;
       }
+
       /* Custom scrollbar to match the dark theme */
       ::-webkit-scrollbar {
         width: 8px;
         height: 8px;
       }
+
       ::-webkit-scrollbar-track {
         background: #09090b;
       }
+
       ::-webkit-scrollbar-thumb {
         background: #27272a;
         border-radius: 4px;
       }
+
       ::-webkit-scrollbar-thumb:hover {
         background: #3f3f46;
       }
@@ -48,34 +52,33 @@
           </div>
           <span class="font-medium text-lg tracking-tight">Deal Hunter</span>
         </div>
-
         <!-- Controls Section -->
         <div class="space-y-4">
-          <h3
-            class="text-xs font-medium uppercase tracking-wider text-zinc-500 pl-1"
+          <button
+            type="button"
+            id="scrapeButton"
+            onclick="startPull()"
+            class="w-full group relative flex items-center justify-center gap-2.5 bg-gradient-to-b from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white px-4 py-3 rounded-lg shadow-[0_0_0_1px_rgba(225,29,72,1),0_1px_2px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.15)] transition-all duration-200 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Controls
-          </h3>
-
-          <form action="/scrape" method="post" id="scrapeForm">
-            <button
-              type="submit"
-              id="scrapeButton"
-              class="w-full group relative flex items-center justify-center gap-2.5 bg-gradient-to-b from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white px-4 py-3 rounded-lg shadow-[0_0_0_1px_rgba(225,29,72,1),0_1px_2px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.15)] transition-all duration-200 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
+            <i data-lucide="download" class="w-4 h-4" id="scrapeIcon"></i>
+            <span class="font-medium text-sm" id="scrapeText"
+              >Pull Products</span
             >
-              <i
-                data-lucide="refresh-cw"
-                class="w-4 h-4"
-                id="scrapeIcon"
-              ></i>
-              <span class="font-medium text-sm" id="scrapeText">Run Scraper</span>
-            </button>
-          </form>
-
+          </button>
           <div class="space-y-1 pt-2">
             <a
-              href="/settings"
+              href="/"
               class="w-full flex items-center gap-3 px-3 py-2 text-sm text-zinc-300 bg-zinc-900/50 rounded-md border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800 transition-colors"
+            >
+              <i
+                data-lucide="layout-dashboard"
+                class="w-4 h-4 text-zinc-500"
+              ></i>
+              Dashboard
+            </a>
+            <a
+              href="/settings"
+              class="w-full flex items-center gap-3 px-3 py-2 text-sm text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50 rounded-md transition-colors"
             >
               <i data-lucide="settings-2" class="w-4 h-4 text-zinc-500"></i>
               Configuration
@@ -90,17 +93,20 @@
           </div>
         </div>
       </div>
-
       <!-- User/Footer -->
       <div class="p-4 border-t border-zinc-800/60 bg-zinc-950">
         <div class="flex items-center gap-3 px-2">
           <div
             class="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center"
           >
-            <span class="text-xs font-medium text-zinc-300">{{ user.initials }}</span>
+            <span class="text-xs font-medium text-zinc-300"
+              >{{ user.initials }}</span
+            >
           </div>
           <div class="flex flex-col">
-            <span class="text-sm font-medium text-zinc-200">{{ user.display_name }}</span>
+            <span class="text-sm font-medium text-zinc-200"
+              >{{ user.display_name }}</span
+            >
             <span class="text-xs text-zinc-500">Deal Hunter</span>
           </div>
           <a
@@ -113,7 +119,6 @@
         </div>
       </div>
     </aside>
-
     <!-- Main Content -->
     <main class="flex-1 flex flex-col h-full bg-black relative overflow-hidden">
       <!-- Top Header / Stats -->
@@ -135,7 +140,6 @@
                 ></span>
               </p>
             </div>
-
             <div class="flex items-center gap-4">
               <div
                 class="bg-zinc-900/50 border border-zinc-800 rounded-lg px-4 py-3 min-w-[140px]"
@@ -164,7 +168,6 @@
           </div>
         </div>
       </header>
-
       <!-- Flash Messages -->
       {% with messages = get_flashed_messages(with_categories=true) %} {% if
       messages %}
@@ -178,7 +181,6 @@
         {% endfor %}
       </div>
       {% endif %} {% endwith %}
-
       <!-- Scrollable Content Area -->
       <div class="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar">
         <div class="max-w-7xl mx-auto space-y-8">
@@ -210,7 +212,6 @@
                   >
                 </div>
               </div>
-
               <!-- Filter Dropdown -->
               <div class="relative min-w-[200px]">
                 <button
@@ -227,7 +228,6 @@
                     id="filterChevron"
                   ></i>
                 </button>
-
                 <!-- Dropdown Menu -->
                 <div
                   id="filterDropdownMenu"
@@ -252,7 +252,6 @@
                 </div>
               </div>
             </div>
-
             <!-- Active Filters -->
             <div
               class="flex items-center gap-2 animate-fade-in"
@@ -279,10 +278,34 @@
               </button>
             </div>
           </section>
-
+          <!-- Loading Overlay -->
+          <div
+            id="loadingOverlay"
+            class="hidden absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center"
+          >
+            <div class="flex flex-col items-center gap-4">
+              <div class="relative">
+                <div
+                  class="w-16 h-16 border-4 border-zinc-700 border-t-rose-500 rounded-full animate-spin"
+                ></div>
+              </div>
+              <div class="text-center">
+                <p
+                  class="text-zinc-200 font-medium text-lg mb-1"
+                  id="loadingTitle"
+                >
+                  Pulling Products...
+                </p>
+                <p class="text-zinc-500 text-sm" id="loadingMessage">
+                  This may take 30-60 seconds
+                </p>
+              </div>
+            </div>
+          </div>
           <!-- Data Table -->
           <section
-            class="border border-zinc-800 rounded-xl bg-zinc-900/20 overflow-hidden shadow-sm"
+            class="border border-zinc-800 rounded-xl bg-zinc-900/20 overflow-hidden shadow-sm relative"
+            id="dealsTableSection"
           >
             <div class="overflow-x-auto">
               <table class="min-w-full text-left border-collapse">
@@ -417,29 +440,87 @@
             </div>
           </section>
         </div>
-
         <!-- Bottom spacing -->
         <div class="h-12"></div>
       </div>
     </main>
-
     <script>
       lucide.createIcons();
 
-      // Handle scraper button loading state
-      document.getElementById("scrapeForm").addEventListener("submit", function(e) {
+      // --- Pull Products (AJAX) ---
+      let pollInterval = null;
+
+      function startPull() {
         const button = document.getElementById("scrapeButton");
-        const icon = document.getElementById("scrapeIcon");
         const text = document.getElementById("scrapeText");
-        
-        // Disable button and show loading state
+        const overlay = document.getElementById("loadingOverlay");
+
+        // Disable button
         button.disabled = true;
-        text.textContent = "Scraping...";
-        icon.classList.add("animate-spin");
-        
-        // Re-render icons to apply animation
-        lucide.createIcons();
-      });
+        text.textContent = "Pulling...";
+
+        // Show loading overlay
+        overlay.classList.remove("hidden");
+
+        // Fire AJAX POST to start the scrape
+        fetch("/scrape", {
+          method: "POST",
+        })
+          .then((r) => r.json())
+          .then((data) => {
+            if (!data.ok) {
+              // Already running or error
+              document.getElementById("loadingMessage").textContent =
+                data.message;
+              return;
+            }
+            // Start polling for status
+            pollInterval = setInterval(pollStatus, 2000);
+          })
+          .catch((err) => {
+            console.error("Failed to start pull:", err);
+            overlay.classList.add("hidden");
+            button.disabled = false;
+            text.textContent = "Pull Products";
+          });
+      }
+
+      function pollStatus() {
+        fetch("/scrape/status")
+          .then((r) => r.json())
+          .then((data) => {
+            const msg = document.getElementById("loadingMessage");
+            msg.textContent = data.message || "Working...";
+
+            if (!data.running) {
+              // Scraping finished — reload page to show new data
+              clearInterval(pollInterval);
+              document.getElementById("loadingTitle").textContent = "Done!";
+              msg.textContent = "Reloading...";
+              setTimeout(() => window.location.reload(), 500);
+            }
+          })
+          .catch((err) => {
+            console.error("Poll error:", err);
+          });
+      }
+
+      // On page load, check if a scrape is already running
+      fetch("/scrape/status")
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.running) {
+            // Resume showing the overlay
+            document.getElementById("scrapeButton").disabled = true;
+            document.getElementById("scrapeText").textContent = "Pulling...";
+            document
+              .getElementById("loadingOverlay")
+              .classList.remove("hidden");
+            document.getElementById("loadingMessage").textContent =
+              data.message || "Working...";
+            pollInterval = setInterval(pollStatus, 2000);
+          }
+        });
 
       // Simple client-side search
       document

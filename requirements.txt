@@ -4,3 +4,4 @@ requests
 apscheduler==3.10.4
 flask
 gunicorn
+psycopg2-binary
