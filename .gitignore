@@ -1,0 +1,13 @@
+# Environment variables (contains secrets)
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Transient state
+scrape_state.json
+
+# OS files
+.DS_Store

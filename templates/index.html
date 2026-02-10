@@ -64,16 +64,13 @@
             <span class="font-medium text-sm" id="scrapeText"
               >Pull Products</span
             >
-            </button>
+          </button>
           <div class="space-y-1 pt-2">
             <a
               href="/"
               class="w-full flex items-center gap-3 px-3 py-2 text-sm text-zinc-300 bg-zinc-900/50 rounded-md border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800 transition-colors"
             >
-              <i
-                data-lucide="home"
-                class="w-4 h-4 text-zinc-500"
-              ></i>
+              <i data-lucide="home" class="w-4 h-4 text-zinc-500"></i>
               Home
             </a>
             <a
@@ -150,7 +147,6 @@
 
       <!-- Scrollable Content Area -->
       <div class="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar relative">
-        
         <!-- Loading Overlay -->
         <div
           id="loadingOverlay"
@@ -197,8 +193,8 @@
                     <i
                       data-lucide="check-circle"
                       class="text-emerald-400 w-5 h-5"
-                  ></i>
-                </div>
+                    ></i>
+                  </div>
                   {% else %}
                   <div
                     class="p-2 bg-red-500/10 rounded-lg border border-red-500/20"
@@ -274,7 +270,7 @@
         const button = document.getElementById("scrapeButton");
         const text = document.getElementById("scrapeText");
         const overlay = document.getElementById("loadingOverlay");
-        
+
         // Disable button
         button.disabled = true;
         text.textContent = "Pulling...";
