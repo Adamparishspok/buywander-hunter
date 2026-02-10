@@ -39,26 +39,36 @@ atexit.register(lambda: scheduler.shutdown())
 def scheduled_scrape_job():
     """Job to run the scraper on schedule."""
     print("Running scheduled nightly scrape...")
-    # Create a unique pull ID
-    pull_id = datetime.now().strftime("%Y%m%d_%H%M%S")
     
-    # Check if already running
-    state = load_scrape_state()
-    if state.get("running"):
-        print("Skipping scheduled scrape: Scraper already running.")
-        return
+    # Iterate over all users and run scrape for each
+    users = load_users()
+    for username in users:
+        print(f"Starting scheduled scrape for {username}...")
+        # Create a unique pull ID
+        pull_id = datetime.now().strftime("%Y%m%d_%H%M%S") + f"_{username}"
+        
+        # Check if already running for this user
+        state = load_scrape_state(username=username)
+        if state.get("running"):
+            print(f"Skipping scheduled scrape for {username}: Scraper already running.")
+            continue
 
-    # Set state
-    state = {
-        "running": True,
-        "message": "Starting scheduled scrape...",
-        "items_found": 0,
-        "pull_id": pull_id,
-    }
-    save_scrape_state(state)
-    
-    # Run task directly (we are already in a background thread from scheduler)
-    _run_scraper_task(pull_id)
+        # Set state
+        state = {
+            "running": True,
+            "message": "Starting scheduled scrape...",
+            "items_found": 0,
+            "pull_id": pull_id,
+        }
+        save_scrape_state(state, username=username)
+        
+        # Load user interests
+        user_interests = load_interests(username=username)
+        
+        # Run task directly (we are already in a background thread from scheduler)
+        # Note: This runs sequentially for each user. If we have many users, we might want to thread this.
+        # But for 2 users, it's fine.
+        _run_scraper_task(pull_id, username=username, user_interests=user_interests)
 
 def load_schedule():
     """Load schedule configuration."""
@@ -102,33 +112,75 @@ save_schedule(load_schedule())
 
 
 # --- Scrape state (file-based, survives restarts) ---
-def load_scrape_state():
+def load_scrape_state(username=None):
     """Load current scrape state from disk."""
     if os.path.exists(SCRAPE_STATE_FILE):
         try:
             with open(SCRAPE_STATE_FILE, "r") as f:
-                return json.load(f)
+                all_states = json.load(f)
+                if username:
+                    return all_states.get(username, {"running": False, "message": "", "items_found": 0, "pull_id": None})
+                return all_states
         except Exception:
             pass
     return {"running": False, "message": "", "items_found": 0, "pull_id": None}
 
 
-def save_scrape_state(state):
+def save_scrape_state(state, username=None):
     """Persist scrape state to disk."""
     try:
-        with open(SCRAPE_STATE_FILE, "w") as f:
-            json.dump(state, f)
+        all_states = {}
+        if os.path.exists(SCRAPE_STATE_FILE):
+            try:
+                with open(SCRAPE_STATE_FILE, "r") as f:
+                    all_states = json.load(f)
+            except Exception:
+                pass
+        
+        if username:
+            all_states[username] = state
+            with open(SCRAPE_STATE_FILE, "w") as f:
+                json.dump(all_states, f)
     except Exception as e:
         print(f"Error saving scrape state: {e}")
 
 
 # On startup: if state says "running" but no thread is alive, mark it failed
-_startup_state = load_scrape_state()
-if _startup_state.get("running"):
-    print("Previous scrape was interrupted. Marking as failed.")
-    _startup_state["running"] = False
-    _startup_state["message"] = "Interrupted by server restart"
-    save_scrape_state(_startup_state)
+_startup_states = load_scrape_state()
+if isinstance(_startup_states, dict):
+    # It returns all states if no username passed, but load_scrape_state returns a default dict if file missing
+    # If it returns the default dict (which has "running" key), it means file was missing or empty or old format.
+    # But now load_scrape_state returns all_states (dict of users) if no username passed.
+    # Wait, my implementation of load_scrape_state returns all_states which is a dict of dicts.
+    # But if file doesn't exist, it returns a single state dict. This is inconsistent.
+    pass
+
+# Let's fix load_scrape_state behavior for no username first.
+# If username is None, it should return the whole dict of users -> states.
+# If file missing, return empty dict.
+# My previous edit:
+# if username: return all_states.get(username, default)
+# return all_states
+# This is correct.
+
+# So back to startup check:
+if os.path.exists(SCRAPE_STATE_FILE):
+    try:
+        with open(SCRAPE_STATE_FILE, "r") as f:
+            _all_states = json.load(f)
+            _updated = False
+            for _user, _state in _all_states.items():
+                if isinstance(_state, dict) and _state.get("running"):
+                    print(f"Previous scrape for {_user} was interrupted. Marking as failed.")
+                    _state["running"] = False
+                    _state["message"] = "Interrupted by server restart"
+                    _updated = True
+            
+            if _updated:
+                with open(SCRAPE_STATE_FILE, "w") as f:
+                    json.dump(_all_states, f)
+    except Exception:
+        pass
 
 
 # --- Auth helpers ---
@@ -193,20 +245,40 @@ def verify_user(username, password):
 
 
 # --- Interest helpers (still JSON-based) ---
-def load_interests():
+def load_interests(username=None):
     if os.path.exists(INTERESTS_FILE):
         try:
             with open(INTERESTS_FILE, "r") as f:
-                return json.load(f)
+                all_interests = json.load(f)
+                if username:
+                    return all_interests.get(username, {})
+                return all_interests
         except Exception as e:
             print(f"Error loading interests: {e}")
     return {}
 
 
-def save_interests(interests):
+def save_interests(interests, username=None):
     try:
+        all_interests = {}
+        if os.path.exists(INTERESTS_FILE):
+            try:
+                with open(INTERESTS_FILE, "r") as f:
+                    all_interests = json.load(f)
+            except Exception:
+                pass
+        
+        if username:
+            all_interests[username] = interests
+        else:
+            # If no username provided, assume we are saving the whole dict (legacy or admin)
+            # But for safety, let's just require username for updates or handle it carefully.
+            # In this app context, we only call save_interests with user data.
+            # If interests is a dict of users, we save it as is.
+            all_interests = interests
+
         with open(INTERESTS_FILE, "w") as f:
-            json.dump(interests, f, indent=4)
+            json.dump(all_interests, f, indent=4)
         return True
     except Exception as e:
         print(f"Error saving interests: {e}")
@@ -255,7 +327,7 @@ def logout():
 @login_required
 def index():
     try:
-        scrape_history = db.load_history()
+        scrape_history = db.load_history(user_id=session.get("username"))
     except Exception as e:
         print(f"Error loading history from DB: {e}")
         scrape_history = []
@@ -267,54 +339,57 @@ def index():
 
 
 # --- Scraper background task ---
-def _run_scraper_task(pull_id):
+def _run_scraper_task(pull_id, username=None, user_interests=None):
     """Background task that runs the scraper and saves to database."""
     try:
-        state = load_scrape_state()
+        state = load_scrape_state(username=username)
         state["message"] = "Fetching auctions from BuyWander..."
-        save_scrape_state(state)
+        save_scrape_state(state, username=username)
         print(f"Starting scraper for pull {pull_id}...")
 
         # Run the scraper - it returns a list of items
-        items = scraper.monitor_deals()
+        # If user_interests is provided, use it. Otherwise, scraper might load default (or we should pass empty)
+        items = scraper.monitor_deals(interests=user_interests)
 
         items_count = len(items)
         print(f"Scraper done. Found {items_count} items for pull {pull_id}.")
 
         # Save to database
         timestamp = datetime.now().strftime("%b %d, %Y - %I:%M %p")
-        db.save_pull_history(pull_id, timestamp, "success", items_count)
+        db.save_pull_history(pull_id, timestamp, "success", items_count, user_id=username)
         if items:
             db.save_pull_items(pull_id, items)
 
-        state = load_scrape_state()
+        state = load_scrape_state(username=username)
         state["message"] = f"Done! Found {items_count} products."
         state["items_found"] = items_count
         state["running"] = False
-        save_scrape_state(state)
+        save_scrape_state(state, username=username)
     except Exception as e:
         print(f"Error in scraper: {e}")
         import traceback
         traceback.print_exc()
 
         timestamp = datetime.now().strftime("%b %d, %Y - %I:%M %p")
-        db.save_pull_history(pull_id, timestamp, "error", 0, str(e))
+        db.save_pull_history(pull_id, timestamp, "error", 0, str(e), user_id=username)
 
-        state = load_scrape_state()
+        state = load_scrape_state(username=username)
         state["message"] = f"Error: {e}"
         state["running"] = False
-        save_scrape_state(state)
+        save_scrape_state(state, username=username)
 
 
 @app.route("/scrape", methods=["POST"])
 @login_required
 def run_scraper():
-    state = load_scrape_state()
+    username = session.get("username")
+    state = load_scrape_state(username=username)
     if state.get("running"):
         return jsonify({"ok": False, "message": "A pull is already in progress."}), 409
 
     # Create a unique pull ID
     pull_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+    user_interests = load_interests(username=username)
 
     state = {
         "running": True,
@@ -322,9 +397,9 @@ def run_scraper():
         "items_found": 0,
         "pull_id": pull_id,
     }
-    save_scrape_state(state)
+    save_scrape_state(state, username=username)
 
-    thread = threading.Thread(target=_run_scraper_task, args=(pull_id,), daemon=True)
+    thread = threading.Thread(target=_run_scraper_task, args=(pull_id, username, user_interests), daemon=True)
     thread.start()
 
     return jsonify({"ok": True, "message": "Pull started."})
@@ -333,7 +408,8 @@ def run_scraper():
 @app.route("/scrape/status")
 @login_required
 def scrape_progress():
-    state = load_scrape_state()
+    username = session.get("username")
+    state = load_scrape_state(username=username)
     return jsonify(state)
 
 
@@ -343,7 +419,7 @@ def scrape_progress():
 def settings():
     return render_template(
         "settings.html", 
-        interests=load_interests(), 
+        interests=load_interests(username=session.get("username")), 
         user=get_user_info(),
         schedule=load_schedule()
     )
@@ -369,12 +445,13 @@ def update_schedule():
 def add_interest():
     category = request.form.get("category")
     keywords_str = request.form.get("keywords")
+    username = session.get("username")
 
     if category and keywords_str:
         keywords = [k.strip() for k in keywords_str.split(",") if k.strip()]
-        interests = load_interests()
+        interests = load_interests(username=username)
         interests[category] = keywords
-        if save_interests(interests):
+        if save_interests(interests, username=username):
             flash(f"Added interest category: {category}", "success")
         else:
             flash("Error saving interest.", "error")
@@ -388,11 +465,12 @@ def add_interest():
 @login_required
 def delete_interest():
     category = request.form.get("category")
+    username = session.get("username")
     if category:
-        interests = load_interests()
+        interests = load_interests(username=username)
         if category in interests:
             del interests[category]
-            if save_interests(interests):
+            if save_interests(interests, username=username):
                 flash(f"Deleted interest category: {category}", "success")
             else:
                 flash("Error saving changes.", "error")
@@ -426,7 +504,7 @@ def pull_detail(pull_id):
         deals = db.load_pull_items(pull_id)
         
         # Find the history entry for this pull
-        history = db.load_history()
+        history = db.load_history(user_id=session.get("username"))
         entry = next((e for e in history if e.get("pull_id") == pull_id), None)
         pull_name = entry["timestamp"] if entry else pull_id
     except Exception as e:

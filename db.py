@@ -12,22 +12,23 @@ def get_connection():
     return psycopg2.connect(database_url)
 
 
-def save_pull_history(pull_id, timestamp, status, items_found, error=None):
+def save_pull_history(pull_id, timestamp, status, items_found, error=None, user_id=None):
     """Save a pull history entry."""
     conn = get_connection()
     try:
         with conn.cursor() as cur:
             cur.execute(
-                """
-                INSERT INTO scrape_history (pull_id, timestamp, status, items_found, error)
-                VALUES (%s, %s, %s, %s, %s)
+                \"\"\"
+                INSERT INTO scrape_history (pull_id, timestamp, status, items_found, error, user_id)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 ON CONFLICT (pull_id) DO UPDATE
                 SET timestamp = EXCLUDED.timestamp,
                     status = EXCLUDED.status,
                     items_found = EXCLUDED.items_found,
-                    error = EXCLUDED.error
-                """,
-                (pull_id, timestamp, status, items_found, error),
+                    error = EXCLUDED.error,
+                    user_id = EXCLUDED.user_id
+                \"\"\",
+                (pull_id, timestamp, status, items_found, error, user_id),
             )
         conn.commit()
     finally:
@@ -72,19 +73,31 @@ def save_pull_items(pull_id, items_list):
         conn.close()
 
 
-def load_history():
+def load_history(user_id=None):
     """Load all pull history entries, ordered by pull_id desc (newest first)."""
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT pull_id, timestamp, status, items_found, error
-                FROM scrape_history
-                ORDER BY pull_id DESC
-                LIMIT 50
-                """
-            )
+            if user_id:
+                cur.execute(
+                    \"\"\"
+                    SELECT pull_id, timestamp, status, items_found, error
+                    FROM scrape_history
+                    WHERE user_id = %s OR user_id IS NULL
+                    ORDER BY pull_id DESC
+                    LIMIT 50
+                    \"\"\",
+                    (user_id,)
+                )
+            else:
+                cur.execute(
+                    \"\"\"
+                    SELECT pull_id, timestamp, status, items_found, error
+                    FROM scrape_history
+                    ORDER BY pull_id DESC
+                    LIMIT 50
+                    \"\"\"
+                )
             rows = cur.fetchall()
             return [
                 {
@@ -133,20 +146,32 @@ def load_pull_items(pull_id):
         conn.close()
 
 
-def get_latest_pull():
+def get_latest_pull(user_id=None):
     """Get the most recent successful pull and its items."""
     conn = get_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT pull_id, timestamp, items_found
-                FROM scrape_history
-                WHERE status = 'success'
-                ORDER BY pull_id DESC
-                LIMIT 1
-                """
-            )
+            if user_id:
+                cur.execute(
+                    \"\"\"
+                    SELECT pull_id, timestamp, items_found
+                    FROM scrape_history
+                    WHERE status = 'success' AND (user_id = %s OR user_id IS NULL)
+                    ORDER BY pull_id DESC
+                    LIMIT 1
+                    \"\"\",
+                    (user_id,)
+                )
+            else:
+                cur.execute(
+                    \"\"\"
+                    SELECT pull_id, timestamp, items_found
+                    FROM scrape_history
+                    WHERE status = 'success'
+                    ORDER BY pull_id DESC
+                    LIMIT 1
+                    \"\"\"
+                )
             row = cur.fetchone()
             if not row:
                 return None, []

@@ -157,10 +157,10 @@ def fetch_all_auctions():
     return all_items
 
 
-def get_interest_match(title):
+def get_interest_match(title, interests):
     title_lower = title.lower()
     matches = []
-    for category, keywords in INTERESTS.items():
+    for category, keywords in interests.items():
         for keyword in keywords:
             if keyword in title_lower:
                 matches.append(category)
@@ -168,9 +168,9 @@ def get_interest_match(title):
     return ", ".join(matches) if matches else None
 
 
-def is_interesting_deal(item):
+def is_interesting_deal(item, interests):
     title = item["item"].get("title", "N/A")
-    interest_match = get_interest_match(title)
+    interest_match = get_interest_match(title, interests)
 
     # If it matches our specific interests, we want to see it regardless of "deal" status
     # But we can still flag if it's a good price
@@ -243,12 +243,15 @@ def send_email(items):
         print(f"Failed to send email: {e}")
 
 
-def monitor_deals():
+def monitor_deals(interests=None):
     """Run the scraper and return a list of product dicts."""
-    # Reload interests to ensure we have the latest updates
-    global INTERESTS
-    INTERESTS = load_interests()
-
+    # Use provided interests or load default/global
+    if interests is None:
+        interests = load_interests()
+    
+    # We no longer rely on global INTERESTS variable for matching logic
+    # but we might want to keep it for load_interests() default behavior
+    
     print("Fetching auctions...")
     auctions = fetch_all_auctions()
     print(f"Fetched {len(auctions)} auctions total")
@@ -256,7 +259,7 @@ def monitor_deals():
     interesting_items = []
 
     for item in auctions:
-        is_interesting, interest_category = is_interesting_deal(item)
+        is_interesting, interest_category = is_interesting_deal(item, interests)
         if is_interesting:
             item["interest_category"] = interest_category
             interesting_items.append(item)
@@ -316,6 +319,7 @@ def monitor_deals():
             print(f"- {title} (Bid: ${price})")
 
         # Send email notification
+        # Note: Email is sent to hardcoded address. We might want to make this user-specific too later.
         send_email(interesting_items)
     else:
         print("No items matching your specific interests found today.")
