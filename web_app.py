@@ -26,6 +26,7 @@ except ImportError:
 
 import scraper
 import db
+import auth
 from apscheduler.schedulers.background import BackgroundScheduler
 import atexit
 
@@ -162,21 +163,21 @@ cleanup_thread.start()
 
 
 # --- Scrape state (file-based, survives restarts) ---
-def load_scrape_state(username=None):
+def load_scrape_state(user_id=None):
     """Load current scrape state from disk."""
     if os.path.exists(SCRAPE_STATE_FILE):
         try:
             with open(SCRAPE_STATE_FILE, "r") as f:
                 all_states = json.load(f)
-                if username:
-                    return all_states.get(username, {"running": False, "message": "", "items_found": 0, "pull_id": None})
+                if user_id:
+                    return all_states.get(user_id, {"running": False, "message": "", "items_found": 0, "pull_id": None})
                 return all_states
         except Exception:
             pass
     return {"running": False, "message": "", "items_found": 0, "pull_id": None}
 
 
-def save_scrape_state(state, username=None):
+def save_scrape_state(state, user_id=None):
     """Persist scrape state to disk."""
     try:
         all_states = {}
@@ -186,9 +187,9 @@ def save_scrape_state(state, username=None):
                     all_states = json.load(f)
             except Exception:
                 pass
-        
-        if username:
-            all_states[username] = state
+
+        if user_id:
+            all_states[user_id] = state
             with open(SCRAPE_STATE_FILE, "w") as f:
                 json.dump(all_states, f)
     except Exception as e:
@@ -234,18 +235,8 @@ if os.path.exists(SCRAPE_STATE_FILE):
 
 
 # --- Auth helpers ---
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if "logged_in" not in session:
-            if request.is_json or request.headers.get("Accept", "").startswith(
-                "application/json"
-            ):
-                return jsonify({"ok": False, "message": "Not logged in"}), 401
-            return redirect(url_for("login"))
-        return f(*args, **kwargs)
-
-    return decorated_function
+# Use Neon Auth decorator instead
+login_required = auth.neon_auth_required
 
 
 # --- User helpers (still JSON-based) ---
@@ -260,7 +251,7 @@ def load_users():
                 return json.load(f)
         except Exception as e:
             print("Error loading users: {}".format(e))
-
+    
     default_users = {
         "Adam": {
             "password": hash_password("adam123"),
@@ -336,65 +327,86 @@ def save_interests(interests, username=None):
 
 
 def get_user_info():
+    user = auth.get_current_user()
+    if user:
+        return {
+            "display_name": user.get("display_name", "User"),
+            "initials": user.get("initials", "U"),
+        }
     return {
-        "display_name": session.get("display_name", "User"),
-        "initials": session.get("initials", "U"),
+        "display_name": "User",
+        "initials": "U",
     }
 
 
 # --- Routes ---
 @app.route("/login", methods=["GET", "POST"])
+@app.route("/login")
 def login():
-    if request.method == "POST":
-        username = request.form.get("username")
-        password = request.form.get("password")
+    """Redirect to Neon Auth login page."""
+    auth_urls = auth.create_auth_urls()
+    return redirect(auth_urls['login'])
 
-        if verify_user(username, password):
-            session["logged_in"] = True
-            session["username"] = username
-            users = load_users()
-            session["display_name"] = users[username]["display_name"]
-            session["initials"] = users[username]["initials"]
-            flash('Welcome back, {}!'.format(session["display_name"]), "success")
+
+@app.route("/signup")
+def signup():
+    """Redirect to Neon Auth signup page."""
+    auth_urls = auth.create_auth_urls()
+    return redirect(auth_urls['signup'])
+
+
+@app.route("/auth/callback")
+def auth_callback():
+    """Handle Neon Auth callback."""
+    token = request.args.get('token')
+    if token and auth.login_user(token):
+        user = auth.get_current_user()
+        if user:
+            flash('Welcome, {}!'.format(user['display_name']), "success")
             return redirect(url_for("index"))
-        else:
-            flash("Invalid credentials.", "error")
 
-    return render_template("login.html")
+    flash("Authentication failed.", "error")
+    return redirect(url_for("login"))
 
 
 @app.route("/logout")
 def logout():
-    session.pop("logged_in", None)
-    session.pop("username", None)
-    session.pop("display_name", None)
-    session.pop("initials", None)
+    auth.logout_user()
+    auth_urls = auth.create_auth_urls()
     flash("You have been logged out.", "success")
-    return redirect(url_for("login"))
+    return redirect(auth_urls['logout'])
 
 
 @app.route("/")
-@login_required
 def index():
+    """Public landing page - redirect to login if not authenticated."""
+    user = auth.get_current_user()
+    if not user:
+        # Not authenticated - redirect to Neon Auth login
+        auth_urls = auth.create_auth_urls()
+        return redirect(auth_urls['login'])
+
+    # Authenticated - show dashboard
     try:
-        scrape_history = db.load_history(user_id=session.get("username"))
+        user_id = user.get('id')
+        scrape_history = db.load_history(user_id=user_id)
     except Exception as e:
         print("Error loading history from DB: {}".format(e))
         scrape_history = []
         flash("Error loading history from database.", "error")
-    
+
     return render_template(
         "index.html", history=scrape_history, user=get_user_info()
     )
 
 
 # --- Scraper background task ---
-def _run_scraper_task(pull_id, username=None, user_interests=None):
+def _run_scraper_task(pull_id, user_id=None, user_interests=None):
     """Background task that runs the scraper and saves to database."""
     try:
-        state = load_scrape_state(username=username)
+        state = load_scrape_state(user_id=user_id)
         state["message"] = "Fetching auctions from BuyWander..."
-        save_scrape_state(state, username=username)
+        save_scrape_state(state, user_id=user_id)
         print("Starting scraper for pull {}...".format(pull_id))
 
         # Run the scraper - it returns a list of items
@@ -405,41 +417,46 @@ def _run_scraper_task(pull_id, username=None, user_interests=None):
         print("Scraper done. Found {} items for pull {}.".format(items_count, pull_id))
 
         # Save to database
-        timestamp = datetime.now().strftime("%b %d, %Y - %I:%M %p")
-        db.save_pull_history(pull_id, timestamp, "success", items_count, user_id=username)
+        timestamp = datetime.now()
+        db.save_pull_history(pull_id, timestamp, "success", items_count, user_id=user_id)
         if items:
             db.save_pull_items(pull_id, items)
 
-        state = load_scrape_state(username=username)
+        state = load_scrape_state(user_id=user_id)
         state["message"] = "Done! Found {} products.".format(items_count)
         state["items_found"] = items_count
         state["running"] = False
-        save_scrape_state(state, username=username)
+        save_scrape_state(state, user_id=user_id)
     except Exception as e:
         print("Error in scraper: {}".format(e))
         import traceback
         traceback.print_exc()
 
-        timestamp = datetime.now().strftime("%b %d, %Y - %I:%M %p")
-        db.save_pull_history(pull_id, timestamp, "error", 0, str(e), user_id=username)
+        timestamp = datetime.now()
+        db.save_pull_history(pull_id, timestamp, "error", 0, str(e), user_id=user_id)
 
-        state = load_scrape_state(username=username)
+        state = load_scrape_state(user_id=user_id)
         state["message"] = "Error: {}".format(e)
         state["running"] = False
-        save_scrape_state(state, username=username)
+        save_scrape_state(state, user_id=user_id)
 
 
 @app.route("/scrape", methods=["POST"])
-@login_required
 def run_scraper():
-    username = session.get("username")
-    state = load_scrape_state(username=username)
+    """Start a scrape - requires authentication."""
+    user = auth.get_current_user()
+    if not user:
+        return jsonify({"ok": False, "message": "Not authenticated"}), 401
+
+    user_id = user.get('id')
+
+    state = load_scrape_state(user_id=user_id)
     if state.get("running"):
         return jsonify({"ok": False, "message": "A pull is already in progress."}), 409
 
     # Create a unique pull ID
     pull_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-    user_interests = load_interests(username=username)
+    user_interests = load_interests(username=user.get('email', ''))  # Use email as username for now
 
     state = {
         "running": True,
@@ -447,26 +464,34 @@ def run_scraper():
         "items_found": 0,
         "pull_id": pull_id,
     }
-    save_scrape_state(state, username=username)
+    save_scrape_state(state, user_id=user_id)
 
-    thread = threading.Thread(target=_run_scraper_task, args=(pull_id, username, user_interests), daemon=True)
+    thread = threading.Thread(target=_run_scraper_task, args=(pull_id, user_id, user_interests), daemon=True)
     thread.start()
 
     return jsonify({"ok": True, "message": "Pull started."})
 
 
 @app.route("/scrape/status")
-@login_required
 def scrape_progress():
-    username = session.get("username")
-    state = load_scrape_state(username=username)
+    """Get scrape progress - requires authentication."""
+    user = auth.get_current_user()
+    if not user:
+        return jsonify({"ok": False, "message": "Not authenticated"}), 401
+
+    user_id = user.get('id')
+    state = load_scrape_state(user_id=user_id)
     return jsonify(state)
 
 
 @app.route("/cleanup", methods=["POST"])
-@login_required
 def manual_cleanup():
-    """Manually trigger cleanup of old scrape data (admin function)."""
+    """Manually trigger cleanup of old scrape data - requires authentication."""
+    user = auth.get_current_user()
+    if not user:
+        auth_urls = auth.create_auth_urls()
+        return redirect(auth_urls['login'])
+
     try:
         import db
         result = db.cleanup_old_scrapes(days_old=2)
@@ -485,38 +510,53 @@ def manual_cleanup():
 
 # --- Settings ---
 @app.route("/settings")
-@login_required
 def settings():
+    """Settings page - requires authentication."""
+    user = auth.get_current_user()
+    if not user:
+        auth_urls = auth.create_auth_urls()
+        return redirect(auth_urls['login'])
+
     return render_template(
-        "settings.html", 
-        interests=load_interests(username=session.get("username")), 
+        "settings.html",
+        interests=load_interests(username=user.get('email', '')),  # Use email as username for now
         user=get_user_info(),
         schedule=load_schedule()
     )
 
 
 @app.route("/settings/schedule", methods=["POST"])
-@login_required
 def update_schedule():
+    """Update schedule settings - requires authentication."""
+    user = auth.get_current_user()
+    if not user:
+        auth_urls = auth.create_auth_urls()
+        return redirect(auth_urls['login'])
+
     enabled = request.form.get("nightly_scan") == "true"
-    
+
     config = {"enabled": enabled}
     if save_schedule(config):
         status = "enabled" if enabled else "disabled"
         flash("Nightly scan {}.".format(status), "success")
     else:
         flash("Error saving schedule settings.", "error")
-        
+
     return redirect(url_for("settings"))
 
 
 @app.route("/settings/add", methods=["POST"])
-@login_required
 def add_interest():
+    """Add an interest category - requires authentication."""
+    user = auth.get_current_user()
+    if not user:
+        auth_urls = auth.create_auth_urls()
+        return redirect(auth_urls['login'])
+
     category = request.form.get("category")
     keywords_str = request.form.get("keywords")
-    username = session.get("username")
-
+    username = user.get('email', '')  # Use email as username for now
+    
     if category and keywords_str:
         keywords = [k.strip() for k in keywords_str.split(",") if k.strip()]
         interests = load_interests(username=username)
@@ -527,15 +567,20 @@ def add_interest():
             flash("Error saving interest.", "error")
     else:
         flash("Category and keywords are required.", "error")
-
+        
     return redirect(url_for("settings"))
 
 
 @app.route("/settings/delete", methods=["POST"])
-@login_required
 def delete_interest():
+    """Delete an interest category - requires authentication."""
+    user = auth.get_current_user()
+    if not user:
+        auth_urls = auth.create_auth_urls()
+        return redirect(auth_urls['login'])
+
     category = request.form.get("category")
-    username = session.get("username")
+    username = user.get('email', '')  # Use email as username for now
     if category:
         interests = load_interests(username=username)
         if category in interests:
@@ -546,7 +591,7 @@ def delete_interest():
                 flash("Error saving changes.", "error")
         else:
             flash("Category not found.", "error")
-
+    
     return redirect(url_for("settings"))
 
 
@@ -567,14 +612,20 @@ def delete_interest():
 
 
 @app.route("/pull/<pull_id>")
-@login_required
 def pull_detail(pull_id):
-    """Show the data from a specific pull."""
+    """Show the data from a specific pull - requires authentication."""
+    user = auth.get_current_user()
+    if not user:
+        auth_urls = auth.create_auth_urls()
+        return redirect(auth_urls['login'])
+
+    user_id = user.get('id')
+
     try:
         deals = db.load_pull_items(pull_id)
-        
+
         # Find the history entry for this pull
-        history = db.load_history(user_id=session.get("username"))
+        history = db.load_history(user_id=user_id)
         entry = next((e for e in history if e.get("pull_id") == pull_id), None)
         pull_name = entry["timestamp"] if entry else pull_id
     except Exception as e:
