@@ -1,0 +1,32 @@
+{
+  "name": "buywander-monorepo",
+  "version": "2.0.0",
+  "description": "BuyWander Deal Hunter - Better Auth + FastAPI + Vue 3",
+  "private": true,
+  "scripts": {
+    "dev": "./start-dev.sh",
+    "lint": "pnpm run lint:auth && pnpm run lint:frontend && pnpm run lint:backend",
+    "lint:auth": "cd auth-server && pnpm run lint",
+    "lint:frontend": "cd frontend && pnpm run lint",
+    "lint:backend": "cd backend && ruff check .",
+    "format": "pnpm run format:auth && pnpm run format:frontend && pnpm run format:backend",
+    "format:auth": "cd auth-server && pnpm run format",
+    "format:frontend": "cd frontend && pnpm run format",
+    "format:backend": "cd backend && ruff format .",
+    "format:check": "pnpm run format:check:auth && pnpm run format:check:frontend && pnpm run format:check:backend",
+    "format:check:auth": "cd auth-server && pnpm run format:check",
+    "format:check:frontend": "cd frontend && pnpm run format:check",
+    "format:check:backend": "cd backend && ruff format --check .",
+    "type-check": "pnpm run type-check:auth && pnpm run type-check:frontend",
+    "type-check:auth": "cd auth-server && tsc --noEmit",
+    "type-check:frontend": "cd frontend && pnpm run type-check",
+    "install:all": "cd auth-server && pnpm install && cd ../frontend && pnpm install && cd ../backend && pip install -r requirements.txt"
+  },
+  "devDependencies": {
+    "prettier": "^3.8.1"
+  },
+  "engines": {
+    "node": ">=22.1.0",
+    "pnpm": ">=9.0.0"
+  }
+}

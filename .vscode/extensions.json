@@ -1,0 +1,22 @@
+{
+  "recommendations": [
+    // Python
+    "charliermarsh.ruff",
+    "ms-python.python",
+    
+    // TypeScript/JavaScript
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    
+    // Vue
+    "vue.volar",
+    "vue.vscode-typescript-vue-plugin",
+    
+    // Tailwind CSS
+    "bradlc.vscode-tailwindcss",
+    
+    // General
+    "editorconfig.editorconfig",
+    "ms-vscode.vscode-typescript-next"
+  ]
+}

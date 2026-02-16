@@ -27,7 +27,7 @@ def format_auction_date(date_string):
 
     try:
         # Parse ISO 8601 date string (e.g., "2026-02-12T03:18:00+00:00")
-        dt_utc = datetime.fromisoformat(date_string.replace('Z', '+00:00'))
+        dt_utc = datetime.fromisoformat(date_string.replace("Z", "+00:00"))
 
         # Convert to local timezone
         dt_local = dt_utc.astimezone()
@@ -161,7 +161,7 @@ def fetch_all_auctions():
             items = data.get("items", [])
             all_items.extend(items)
             print(f"Page {page}: Got {len(items)} items")
-            
+
             # Check if there's a next page AND we haven't hit our limit
             if not data.get("hasNextPage", False):
                 print("No more pages available")
@@ -169,7 +169,7 @@ def fetch_all_auctions():
             if page >= max_pages:
                 print(f"Reached max pages limit ({max_pages})")
                 break
-                
+
             page += 1
             # Brief delay (0.5-1 second) to avoid rate limits
             time.sleep(random.uniform(0.5, 1.0))
@@ -226,9 +226,7 @@ def send_email(items):
     # Add top 20 items to email to keep it readable
     for item in items[:20]:
         title = item["item"].get("title", "N/A")
-        price = (
-            item.get("winningBid", {}).get("amount", 0) if item.get("winningBid") else 0
-        )
+        price = item.get("winningBid", {}).get("amount", 0) if item.get("winningBid") else 0
         url = f"https://buywander.com/auction/{item['id']}"
         category = item.get("interest_category", "Unknown")
 
@@ -270,10 +268,10 @@ def monitor_deals(interests=None):
     # Use provided interests or load default/global
     if interests is None:
         interests = load_interests()
-    
+
     # We no longer rely on global INTERESTS variable for matching logic
     # but we might want to keep it for load_interests() default behavior
-    
+
     print("Fetching auctions...")
     auctions = fetch_all_auctions()
     print(f"Fetched {len(auctions)} auctions total")
@@ -315,17 +313,19 @@ def monitor_deals(interests=None):
             discount_percentage = ((retail - bid) / retail) * 100
             deal_score = round(max(0, min(100, discount_percentage)))
 
-        results.append({
-            "Interest Category": interest,
-            "Title": title,
-            "Retail": retail,
-            "Current Bid": bid,
-            "Bids": bids_count,
-            "End Date": end_date,
-            "URL": url,
-            "Image URL": image_url,
-            "Deal Score": deal_score,
-        })
+        results.append(
+            {
+                "Interest Category": interest,
+                "Title": title,
+                "Retail": retail,
+                "Current Bid": bid,
+                "Bids": bids_count,
+                "End Date": end_date,
+                "URL": url,
+                "Image URL": image_url,
+                "Deal Score": deal_score,
+            }
+        )
 
     if interesting_items:
         print(f"Found {len(interesting_items)} interesting items!")
@@ -334,11 +334,7 @@ def monitor_deals(interests=None):
         print("\n--- Summary of Findings ---")
         for item in interesting_items[:5]:  # Show first 5
             title = item["item"].get("title", "N/A")
-            price = (
-                item.get("winningBid", {}).get("amount", 0)
-                if item.get("winningBid")
-                else 0
-            )
+            price = item.get("winningBid", {}).get("amount", 0) if item.get("winningBid") else 0
             print(f"- {title} (Bid: ${price})")
 
         # Send email notification

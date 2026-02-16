@@ -1,5 +1,6 @@
 # Environment variables (contains secrets)
 .env
+backend/.env
 
 # Python
 __pycache__/
@@ -8,6 +9,13 @@ __pycache__/
 
 # Transient state
 scrape_state.json
+backend/scrape_state.json
+
+# Node
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
 
 # OS files
 .DS_Store

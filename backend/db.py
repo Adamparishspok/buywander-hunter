@@ -1,4 +1,5 @@
 """Database helpers for Neon Postgres."""
+
 import os
 import psycopg2
 from psycopg2.extras import execute_batch
@@ -40,26 +41,28 @@ def save_pull_items(pull_id, items_list):
     """Bulk insert pull items. items_list should be a list of dicts with keys matching the CSV columns."""
     if not items_list:
         return
-    
+
     conn = get_connection()
     try:
         with conn.cursor() as cur:
             # Convert items to tuples for insertion
             rows = []
             for item in items_list:
-                rows.append((
-                    pull_id,
-                    item.get("Interest Category"),
-                    item.get("Title"),
-                    item.get("Retail"),
-                    item.get("Current Bid"),
-                    item.get("Bids"),
-                    item.get("End Date"),
-                    item.get("URL"),
-                    item.get("Image URL"),
-                    item.get("Deal Score"),
-                ))
-            
+                rows.append(
+                    (
+                        pull_id,
+                        item.get("Interest Category"),
+                        item.get("Title"),
+                        item.get("Retail"),
+                        item.get("Current Bid"),
+                        item.get("Bids"),
+                        item.get("End Date"),
+                        item.get("URL"),
+                        item.get("Image URL"),
+                        item.get("Deal Score"),
+                    )
+                )
+
             execute_batch(
                 cur,
                 """
@@ -88,7 +91,7 @@ def load_history(user_id=None):
                     ORDER BY pull_id DESC
                     LIMIT 50
                     """,
-                    (user_id,)
+                    (user_id,),
                 )
             else:
                 cur.execute(
@@ -161,7 +164,7 @@ def get_latest_pull(user_id=None):
                     ORDER BY pull_id DESC
                     LIMIT 1
                     """,
-                    (user_id,)
+                    (user_id,),
                 )
             else:
                 cur.execute(
@@ -176,14 +179,14 @@ def get_latest_pull(user_id=None):
             row = cur.fetchone()
             if not row:
                 return None, []
-            
+
             pull_id, timestamp, items_found = row
             entry = {
                 "pull_id": pull_id,
                 "timestamp": timestamp,
                 "items_found": items_found,
             }
-            
+
             items = load_pull_items(pull_id)
             return entry, items
     finally:
@@ -213,7 +216,7 @@ def cleanup_old_scrapes(days_old=2):
                     WHERE timestamp < %s
                 )
                 """,
-                (cutoff_date,)
+                (cutoff_date,),
             )
             items_deleted = cur.rowcount
 
@@ -223,7 +226,7 @@ def cleanup_old_scrapes(days_old=2):
                 DELETE FROM scrape_history
                 WHERE timestamp < %s
                 """,
-                (cutoff_date,)
+                (cutoff_date,),
             )
             history_deleted = cur.rowcount
 
@@ -233,7 +236,7 @@ def cleanup_old_scrapes(days_old=2):
             "items_deleted": items_deleted,
             "history_deleted": history_deleted,
             "cutoff_date": cutoff_date.isoformat(),
-            "days_old": days_old
+            "days_old": days_old,
         }
     finally:
         conn.close()

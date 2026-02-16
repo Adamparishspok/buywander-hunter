@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Login - BuyWander Deal Hunter</title>
+    <title>Sign Up - BuyWander Deal Hunter</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
     <link
@@ -51,7 +51,7 @@
         class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-indigo-500/10 rounded-full blur-[100px] pointer-events-none"
       ></div>
     </div>
-    <!-- Login Container -->
+    <!-- Signup Container -->
     <div class="w-full max-w-sm px-6 relative z-10">
       <!-- Header / Logo -->
       <div class="flex flex-col items-center mb-8 space-y-2">
@@ -66,9 +66,9 @@
           ></iconify-icon>
         </div>
         <h1 class="text-2xl font-medium text-white tracking-tight">
-          Welcome back
+          Create account
         </h1>
-        <p class="text-sm text-zinc-500">Sign in to your account</p>
+        <p class="text-sm text-zinc-500">Sign up to get started</p>
       </div>
       <!-- Flash Messages -->
       {% with messages = get_flashed_messages(with_categories=true) %} {% if
@@ -76,19 +76,36 @@
       <div class="mb-6">
         {% for category, message in messages %}
         <div
-          class="p-3 rounded-lg text-sm text-center {% if category == 'error' %}bg-red-500/10 text-red-400 border border-red-500/20{% else %}bg-emerald-500/10 text-emerald-400 border border-emerald-500/20{% endif %}"
+          class="p-3 rounded-lg text-sm text-center {% if category == 'error' %}bg-red-500/10 text-red-400 border border-red-500/20{% elif category == 'info' %}bg-blue-500/10 text-blue-400 border border-blue-500/20{% else %}bg-emerald-500/10 text-emerald-400 border border-emerald-500/20{% endif %}"
         >
           {{ message }}
         </div>
         {% endfor %}
       </div>
       {% endif %} {% endwith %}
-      <!-- Login Form -->
+      <!-- Signup Form -->
       <form
         method="POST"
         class="bg-zinc-950/50 backdrop-blur-xl border border-zinc-800/60 rounded-2xl p-6 sm:p-8 shadow-2xl ring-1 ring-white/5"
       >
         <div class="space-y-4">
+          <!-- Name Field (optional) -->
+          <div>
+            <label
+              for="name"
+              class="block text-sm font-medium text-zinc-300 mb-2"
+            >
+              Name (optional)
+            </label>
+            <input
+              type="text"
+              id="name"
+              name="name"
+              class="w-full px-3 py-2 bg-zinc-900/50 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
+              placeholder="Enter your name"
+            />
+          </div>
+
           <!-- Email Field -->
           <div>
             <label
@@ -125,12 +142,12 @@
             />
           </div>
 
-          <!-- Sign In Button -->
+          <!-- Sign Up Button -->
           <button
             type="submit"
             class="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-4 rounded-lg shadow-[0_0_20px_-5px_rgba(99,102,241,0.3)] transition-all duration-200 active:scale-[0.98] text-sm"
           >
-            <span>Sign in</span>
+            <span>Create account</span>
             <iconify-icon
               icon="solar:arrow-right-linear"
               width="18"
@@ -138,13 +155,13 @@
             ></iconify-icon>
           </button>
 
-          <!-- Sign Up Link -->
+          <!-- Sign In Link -->
           <div class="text-center">
             <a
-              href="/signup"
+              href="/login"
               class="text-sm text-zinc-400 hover:text-zinc-200 transition-colors"
             >
-              Need an account? Sign up
+              Already have an account? Sign in
             </a>
           </div>
         </div>

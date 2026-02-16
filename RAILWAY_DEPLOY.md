@@ -1,102 +1,54 @@
 # Railway Deployment Guide
 
-## ✅ Code Pushed!
+Since we've upgraded to a monorepo structure with a dedicated Auth Server, deployment requires two services on Railway.
 
-Your code has been pushed to GitHub: `Adamparishspok/buywander-hunter`
+## Prerequisites
 
-Railway should automatically detect the push and start deploying.
+1.  **Railway Account** connected to your GitHub repo.
+2.  **PostgreSQL Database** (Neon or Railway Postgres).
 
-## 🔧 Required: Set Environment Variable
+## Service 1: Auth Server (Node.js)
 
-**You MUST add the DATABASE_URL to Railway for the app to work:**
+This service handles authentication (signup, login, sessions).
 
-1. Go to your Railway project dashboard
-2. Click on your service (web app)
-3. Go to **Variables** tab
-4. Click **+ New Variable**
-5. Add:
+1.  **Create New Service** -> **GitHub Repo** -> Select your repo.
+2.  **Configure Service**:
+    *   **Root Directory**: `auth-server`
+    *   **Build Command**: `pnpm install && pnpm run build`
+    *   **Start Command**: `pnpm start`
+    *   **Watch Paths**: `auth-server/**` (optional)
+3.  **Environment Variables**:
+    *   `DATABASE_URL`: Connection string to your Postgres DB (same as backend).
+    *   `BETTER_AUTH_SECRET`: A random string (generate one).
+    *   `BETTER_AUTH_URL`: The public URL of *this* service (e.g., `https://auth-production.up.railway.app`).
+    *   `PORT`: `3001` (Railway usually overrides this, but good to set).
 
-```
-DATABASE_URL=postgresql://neondb_owner:<YOUR_PASSWORD>@ep-nameless-mouse-af40upqp-pooler.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require
-```
+## Service 2: Main App (Backend + Frontend)
 
-> Get the actual password from your `.env` file or the Neon console.
+This service runs the FastAPI backend and serves the Vue frontend.
 
-6. Click **Save** - Railway will automatically redeploy
+1.  **Create New Service** -> **GitHub Repo** -> Select your repo.
+2.  **Configure Service**:
+    *   **Root Directory**: `/` (leave empty)
+    *   **Docker**: Railway should automatically detect the `Dockerfile`.
+3.  **Environment Variables**:
+    *   `DATABASE_URL`: Same Postgres connection string.
+    *   `SECRET_KEY`: A random string for internal encryption.
+    *   `BETTER_AUTH_URL`: The public URL of the **Auth Server** (from step 1).
+    *   `PORT`: `8000`
 
-## Optional Environment Variables
+## Networking
 
-```bash
-# Flask session secret (generate a strong random string)
-SECRET_KEY=your-random-secret-key-here
+1.  **Auth Server**: Needs a public domain (e.g., `auth-production.up.railway.app`).
+2.  **Main App**: Needs a public domain (e.g., `buywander-production.up.railway.app`).
 
-# If you want to change default passwords later
-# (users.json will reset on each deploy since it's in filesystem)
-```
+## Important Notes
 
-## What Happens on Deploy
-
-1. Railway detects the push to `main`
-2. Installs dependencies from `requirements.txt` (includes `psycopg2-binary`)
-3. Runs `gunicorn web_app:app` (from Procfile)
-4. Connects to your Neon database using `DATABASE_URL`
-5. App is live! 🎉
-
-## After Deploy
-
-- **Login:** Adam / adam123 (or Alex / alex123)
-- Click **"Pull Products"** to start scraping
-- View results on Dashboard
-- Check **Scrape History** for all past pulls
-- Click any history entry to see its specific data
-
-## ⚠️ Important Notes
-
-### Data That Persists (in Neon DB)
-- ✅ Pull history
-- ✅ Product data from each pull
-- ✅ Survives Railway deploys/restarts
-
-### Data That Resets on Deploy
-- ❌ `users.json` - User accounts reset to defaults
-- ❌ `interests.json` - Interest categories reset to defaults
-- ❌ `scrape_state.json` - Transient state (OK to reset)
-
-### Recommended: Migrate users/interests to Neon
-
-Consider adding these tables in a future update:
-- `users` table for persistent user accounts
-- `interests` table for persistent interest categories
-
-For now, you can:
-- Set them via environment variables
-- Add a seed script that runs on startup
-- Or just reconfigure them after each deploy
-
-## Neon Project Info
-
-**Project:** buywander (gentle-base-21176446)  
-**Database:** neondb  
-**Region:** AWS US West 2  
-**Console:** https://console.neon.tech/app/projects/gentle-base-21176446
-
-## Testing Deployment
-
-Once Railway finishes deploying (usually 2-3 minutes):
-
-1. Open your Railway app URL
-2. Login with Adam / adam123
-3. Click "Pull Products"
-4. Wait ~20-30 seconds
-5. Dashboard shows ~170-180 products
-6. Go to Scrape History - you'll see the pull
-7. Click it to view that pull's data
+*   **CORS**: Ensure your `BETTER_AUTH_URL` environment variable in the Main App matches the Auth Server's domain exactly.
+*   **Database**: Both services MUST connect to the same database. Better Auth manages the `user`, `session`, etc. tables, while FastAPI reads from them.
+*   **Migrations**: The Main App (FastAPI) handles migrations via Alembic. You might need to run `alembic upgrade head` in the Main App's shell or as a startup command if not automated.
 
 ## Troubleshooting
 
-If the app crashes on Railway:
-
-1. Check Railway logs for errors
-2. Verify `DATABASE_URL` is set correctly
-3. Make sure it includes `?sslmode=require` at the end
-4. Check that psycopg2-binary installed (should be in requirements.txt)
+*   **Frontend 404s**: If the frontend doesn't load, ensure the Docker build completed successfully and `static/index.html` exists in the container.
+*   **Auth Errors**: Check that `BETTER_AUTH_URL` is correct in both services and that they share the same `DATABASE_URL`.
