@@ -1,0 +1,40 @@
+# FastAPI Core
+fastapi
+uvicorn[standard]
+python-multipart
+
+# Database & ORM
+sqlmodel
+asyncpg
+alembic
+
+# Authentication
+pyjwt
+bcrypt
+passlib[bcrypt]
+python-jose[cryptography]
+
+# Environment & Config
+python-dotenv
+pydantic[email]
+pydantic-settings
+
+# HTTP & CORS
+httpx
+
+# Background Jobs & Scheduling
+apscheduler
+redis
+
+# Data Processing
+pandas
+requests
+
+# Utilities
+python-dateutil
+
+# Development
+ruff
+pytest
+pytest-asyncio
+pre-commit

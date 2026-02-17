@@ -14,7 +14,7 @@
     "type-check": "vue-tsc --noEmit"
   },
   "engines": {
-    "node": ">=22.1.0",
+    "node": "*",
     "pnpm": ">=9.0.0"
   },
   "dependencies": {
@@ -28,15 +28,16 @@
     "reka-ui": "^2.8.0",
     "tailwind-merge": "^3.4.1",
     "tailwindcss-animate": "^1.0.7",
-    "vue": "^3.5.25",
+    "vue": "^3.5.28",
     "vue-router": "^5.0.2"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@tailwindcss/postcss": "^4.1.18",
     "@types/node": "^25.2.3",
     "@typescript-eslint/eslint-plugin": "^8.56.0",
     "@typescript-eslint/parser": "^8.56.0",
-    "@vitejs/plugin-vue": "^6.0.2",
+    "@vitejs/plugin-vue": "^6.0.4",
     "@vue/tsconfig": "^0.8.1",
     "autoprefixer": "^10.4.24",
     "eslint": "^10.0.0",

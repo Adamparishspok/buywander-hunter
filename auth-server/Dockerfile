@@ -5,16 +5,24 @@ WORKDIR /app
 # Install pnpm
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-# Copy package files
-COPY package.json ./
+# Copy workspace root files for pnpm workspace resolution
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
-# Install dependencies (no frozen lockfile since it's in root)
-RUN pnpm install
+# Copy auth-server package.json
+COPY auth-server/package.json ./auth-server/
 
-# Copy source
-COPY . .
+# Copy frontend package.json (needed for workspace install)
+COPY frontend/package.json ./frontend/
 
-# Build
+# Install dependencies using workspace lockfile
+RUN pnpm install --frozen-lockfile --filter auth-server
+
+WORKDIR /app/auth-server
+
+# Copy auth-server source
+COPY auth-server/ .
+
+# Build TypeScript
 RUN pnpm run build
 
 # Start

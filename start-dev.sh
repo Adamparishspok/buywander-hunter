@@ -20,7 +20,7 @@ echo "Auth server started (PID: $AUTH_PID)"
 sleep 3
 
 # Start backend in background
-(cd backend && uvicorn main:app --reload --host 0.0.0.0 --port 8000) &
+(cd backend && /Users/adamparish/Library/Python/3.11/bin/uvicorn main:app --reload --host 0.0.0.0 --port 8000) &
 BACKEND_PID=$!
 echo "Backend started (PID: $BACKEND_PID)"
 

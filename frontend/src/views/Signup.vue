@@ -58,6 +58,7 @@
               id="name"
               v-model="name"
               type="text"
+              autocomplete="name"
               class="w-full px-3 py-2 bg-zinc-900/50 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
               placeholder="Enter your name"
             />
@@ -71,6 +72,7 @@
               v-model="email"
               type="email"
               required
+              autocomplete="email"
               class="w-full px-3 py-2 bg-zinc-900/50 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
               placeholder="Enter your email"
             />
@@ -86,6 +88,7 @@
               v-model="password"
               type="password"
               required
+              autocomplete="new-password"
               class="w-full px-3 py-2 bg-zinc-900/50 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
               placeholder="Enter your password"
             />

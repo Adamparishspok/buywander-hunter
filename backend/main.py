@@ -21,6 +21,7 @@ load_dotenv()
 
 from database import get_session, init_db
 from models import (
+    User,
     ScrapeHistory,
     ScrapeItem,
     ScrapeHistoryResponse,
@@ -70,7 +71,7 @@ app = FastAPI(
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://localhost:5175", "http://localhost:5176", "http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -80,7 +81,7 @@ app.add_middleware(
 # ==================== Helper Functions ====================
 
 
-def load_scrape_state(user_id: Optional[int] = None) -> dict:
+def load_scrape_state(user_id: Optional[str] = None) -> dict:
     """Load current scrape state from disk."""
     if os.path.exists(SCRAPE_STATE_FILE):
         try:
@@ -97,7 +98,7 @@ def load_scrape_state(user_id: Optional[int] = None) -> dict:
     return {"running": False, "message": "", "items_found": 0, "pull_id": None}
 
 
-def save_scrape_state(state: dict, user_id: Optional[int] = None):
+def save_scrape_state(state: dict, user_id: Optional[str] = None):
     """Persist scrape state to disk."""
     try:
         all_states = {}
@@ -233,7 +234,7 @@ def scheduled_scrape_job():
     # For now, keeping it simple
 
 
-async def run_scraper_task(pull_id: str, user_id: int, user_interests: dict):
+async def run_scraper_task(pull_id: str, user_id: str, user_interests: dict):
     """Background task that runs the scraper."""
     try:
         state = load_scrape_state(user_id=user_id)
@@ -275,69 +276,15 @@ async def run_scraper_task(pull_id: str, user_id: int, user_interests: dict):
         save_scrape_state(state, user_id=user_id)
 
 
-# ==================== Auth Routes ====================
-# Auth is handled by Better Auth server on port 3001
-# FastAPI only verifies tokens and returns user info
-
-
-@app.get("/api/auth/me", response_model=dict)
-async def get_me(current_user: dict = Depends(get_current_user)):
-    """Get current user info from Better Auth token."""
-    return {"success": True, "user": current_user}
-
-
-@app.api_route("/api/auth/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"])
-async def proxy_auth(path: str, request: Request):
-    """Proxy requests to the Better Auth server."""
-    better_auth_url = os.getenv("BETTER_AUTH_URL", "http://localhost:3001")
-    # Ensure no trailing slash on base URL
-    better_auth_url = better_auth_url.rstrip("/")
-    
-    target_url = f"{better_auth_url}/api/auth/{path}"
-    
-    # Forward query params
-    params = dict(request.query_params)
-    
-    # Forward headers (excluding host to avoid issues)
-    headers = dict(request.headers)
-    headers.pop("host", None)
-    headers.pop("content-length", None) # Let httpx handle this
-    
-    # Forward body
-    body = await request.body()
-    
-    async with httpx.AsyncClient() as client:
-        try:
-            response = await client.request(
-                method=request.method,
-                url=target_url,
-                params=params,
-                headers=headers,
-                content=body,
-                follow_redirects=False
-            )
-        except httpx.RequestError as e:
-            print(f"Auth proxy error: {e}")
-            raise HTTPException(status_code=502, detail="Auth server unavailable")
-        
-    # Create response
-    proxy_response = Response(
-        content=response.content,
-        status_code=response.status_code,
-        headers=dict(response.headers)
-    )
-    return proxy_response
-
-
 # ==================== Scraping Routes ====================
 
 
 @app.post("/api/scrape")
 async def start_scrape(
-    current_user: User = Depends(get_current_user), session: AsyncSession = Depends(get_session)
+    current_user: dict = Depends(get_current_user), session: AsyncSession = Depends(get_session)
 ):
     """Start a scrape job."""
-    user_id = current_user.id
+    user_id = current_user["id"]
 
     state = load_scrape_state(user_id=user_id)
     if state.get("running"):
@@ -346,7 +293,7 @@ async def start_scrape(
         )
 
     pull_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-    user_interests = load_interests(username=current_user.email)
+    user_interests = load_interests(username=current_user["email"])
 
     state = {
         "running": True,
@@ -366,22 +313,22 @@ async def start_scrape(
 
 
 @app.get("/api/scrape/status")
-async def get_scrape_status(current_user: User = Depends(get_current_user)):
+async def get_scrape_status(current_user: dict = Depends(get_current_user)):
     """Get scrape job status."""
-    user_id = current_user.id
+    user_id = current_user["id"]
     state = load_scrape_state(user_id=user_id)
     return {"success": True, "status": state}
 
 
 @app.get("/api/history")
 async def get_history(
-    current_user: User = Depends(get_current_user), session: AsyncSession = Depends(get_session)
+    current_user: dict = Depends(get_current_user), session: AsyncSession = Depends(get_session)
 ):
     """Get scrape history."""
     try:
         from db import load_history
 
-        scrape_history = load_history(user_id=current_user.id)
+        scrape_history = load_history(user_id=current_user["id"])
 
         # Convert datetime to strings
         for entry in scrape_history:
@@ -398,9 +345,9 @@ async def get_history(
 
 
 @app.get("/api/settings")
-async def get_settings(current_user: User = Depends(get_current_user)):
+async def get_settings(current_user: dict = Depends(get_current_user)):
     """Get user settings."""
-    interests = load_interests(username=current_user.email)
+    interests = load_interests(username=current_user["email"])
     schedule = load_schedule()
 
     return {"success": True, "settings": {"interests": interests, "schedule": schedule}}
@@ -408,7 +355,7 @@ async def get_settings(current_user: User = Depends(get_current_user)):
 
 @app.post("/api/settings/schedule")
 async def update_schedule_endpoint(
-    schedule_data: ScheduleUpdate, current_user: User = Depends(get_current_user)
+    schedule_data: ScheduleUpdate, current_user: dict = Depends(get_current_user)
 ):
     """Update schedule settings."""
     config = {"enabled": schedule_data.enabled}
@@ -422,10 +369,10 @@ async def update_schedule_endpoint(
 
 @app.post("/api/settings/interests")
 async def add_interest_endpoint(
-    interest_data: InterestCreate, current_user: User = Depends(get_current_user)
+    interest_data: InterestCreate, current_user: dict = Depends(get_current_user)
 ):
     """Add an interest category."""
-    username = current_user.email
+    username = current_user["email"]
 
     if not interest_data.category or not interest_data.keywords:
         raise HTTPException(status_code=400, detail="Category and keywords are required")
@@ -441,9 +388,9 @@ async def add_interest_endpoint(
 
 
 @app.delete("/api/settings/interests/{category}")
-async def delete_interest_endpoint(category: str, current_user: User = Depends(get_current_user)):
+async def delete_interest_endpoint(category: str, current_user: dict = Depends(get_current_user)):
     """Delete an interest category."""
-    username = current_user.email
+    username = current_user["email"]
     interests = load_interests(username=username)
 
     if category in interests:
@@ -462,7 +409,7 @@ async def delete_interest_endpoint(category: str, current_user: User = Depends(g
 @app.get("/api/pull/{pull_id}")
 async def get_pull_detail(
     pull_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
     """Get details of a specific pull."""
@@ -470,7 +417,7 @@ async def get_pull_detail(
         from db import load_pull_items, load_history
 
         deals = load_pull_items(pull_id)
-        history = load_history(user_id=current_user.id)
+        history = load_history(user_id=current_user["id"])
         entry = next((e for e in history if e.get("pull_id") == pull_id), None)
 
         pull_name = entry["timestamp"].isoformat() if entry and "timestamp" in entry else pull_id
@@ -492,7 +439,7 @@ async def get_pull_detail(
 
 
 @app.post("/api/cleanup")
-async def manual_cleanup(current_user: User = Depends(get_current_user)):
+async def manual_cleanup(current_user: dict = Depends(get_current_user)):
     """Manually trigger cleanup of old data."""
     try:
         from db import cleanup_old_scrapes
