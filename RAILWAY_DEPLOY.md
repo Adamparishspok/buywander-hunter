@@ -1,54 +1,65 @@
 # Railway Deployment Guide
 
-Since we've upgraded to a monorepo structure with a dedicated Auth Server, deployment requires two services on Railway.
+We have configured the application to run as two services on Railway:
+1.  **Auth Server** (Node.js) - Handles authentication.
+2.  **Main App** (Python/FastAPI + Vue) - Runs the backend and serves the frontend.
 
 ## Prerequisites
 
 1.  **Railway Account** connected to your GitHub repo.
-2.  **PostgreSQL Database** (Neon or Railway Postgres).
+2.  **Railway CLI** installed and logged in (`railway login`).
 
-## Service 1: Auth Server (Node.js)
+## Step 1: Create Project & Database
 
-This service handles authentication (signup, login, sessions).
+1.  Go to [Railway Dashboard](https://railway.app/dashboard).
+2.  Click **New Project** -> **Provision PostgreSQL**.
+3.  This creates a project with a database.
 
-1.  **Create New Service** -> **GitHub Repo** -> Select your repo.
-2.  **Configure Service**:
-    *   **Root Directory**: `auth-server`
-    *   **Build Command**: `pnpm install && pnpm run build`
-    *   **Start Command**: `pnpm start`
-    *   **Watch Paths**: `auth-server/**` (optional)
-3.  **Environment Variables**:
-    *   `DATABASE_URL`: Connection string to your Postgres DB (same as backend).
-    *   `BETTER_AUTH_SECRET`: A random string (generate one).
-    *   `BETTER_AUTH_URL`: The public URL of *this* service (e.g., `https://auth-production.up.railway.app`).
-    *   `PORT`: `3001` (Railway usually overrides this, but good to set).
+## Step 2: Deploy Auth Server
 
-## Service 2: Main App (Backend + Frontend)
+1.  In the project view, click **New** -> **GitHub Repo**.
+2.  Select your repo (`buywander`).
+3.  Click **Variables** and add:
+    *   `DATABASE_URL`: (Reference the Postgres variable, usually `${{Postgres.DATABASE_URL}}`)
+    *   `BETTER_AUTH_SECRET`: Generate a random string (e.g. `openssl rand -hex 32`).
+    *   `BETTER_AUTH_URL`: `https://auth-server-production-acc6.up.railway.app`
+    *   `PORT`: `3001`
+4.  Click **Settings** -> **General** -> **Root Directory**: Set to `/auth-server`.
+5.  Click **Settings** -> **Networking** -> **Generate Domain**.
+6.  Copy this domain (e.g. `https://auth-production.up.railway.app`) and update the `BETTER_AUTH_URL` variable from step 3.
+7.  The service should redeploy and be healthy.
 
-This service runs the FastAPI backend and serves the Vue frontend.
+## Step 3: Deploy Main App
 
-1.  **Create New Service** -> **GitHub Repo** -> Select your repo.
-2.  **Configure Service**:
-    *   **Root Directory**: `/` (leave empty)
-    *   **Docker**: Railway should automatically detect the `Dockerfile`.
-3.  **Environment Variables**:
-    *   `DATABASE_URL`: Same Postgres connection string.
-    *   `SECRET_KEY`: A random string for internal encryption.
-    *   `BETTER_AUTH_URL`: The public URL of the **Auth Server** (from step 1).
+1.  Click **New** -> **GitHub Repo** (Select the same repo again).
+2.  Click **Variables** and add:
+    *   `DATABASE_URL`: `${{Postgres.DATABASE_URL}}`
+    *   `SECRET_KEY`: Generate a random string.
+    *   `BETTER_AUTH_URL`: `https://auth-server-production-acc6.up.railway.app`
     *   `PORT`: `8000`
+3.  Click **Settings** -> **General** -> **Root Directory**: Leave empty (`/`).
+4.  Railway will detect the `Dockerfile` in the root and build it.
+5.  Click **Settings** -> **Networking** -> **Generate Domain**.
+6.  This is your main application URL: `https://main-app-production-fea8.up.railway.app`
 
-## Networking
+## Step 4: Final Configuration
 
-1.  **Auth Server**: Needs a public domain (e.g., `auth-production.up.railway.app`).
-2.  **Main App**: Needs a public domain (e.g., `buywander-production.up.railway.app`).
-
-## Important Notes
-
-*   **CORS**: Ensure your `BETTER_AUTH_URL` environment variable in the Main App matches the Auth Server's domain exactly.
-*   **Database**: Both services MUST connect to the same database. Better Auth manages the `user`, `session`, etc. tables, while FastAPI reads from them.
-*   **Migrations**: The Main App (FastAPI) handles migrations via Alembic. You might need to run `alembic upgrade head` in the Main App's shell or as a startup command if not automated.
+1.  **CORS**: Ensure your Auth Server allows requests from your Main App.
+    *   In **Auth Server** variables, you might need to check `better-auth` trusted origins.
+    *   However, since we are proxying auth requests through the Main App backend, the requests come from the Main App's backend IP (server-to-server) or appear as same-origin to the browser.
+    *   Our setup proxies `/api/auth` from Main App -> Auth Server.
+    *   So the browser only talks to Main App.
+    *   This simplifies CORS significantly!
 
 ## Troubleshooting
 
-*   **Frontend 404s**: If the frontend doesn't load, ensure the Docker build completed successfully and `static/index.html` exists in the container.
-*   **Auth Errors**: Check that `BETTER_AUTH_URL` is correct in both services and that they share the same `DATABASE_URL`.
+*   **Build Fails**: Check the logs. Ensure `pnpm-lock.yaml` is present.
+*   **Auth Errors**: Check `BETTER_AUTH_URL` in Main App matches Auth Server URL.
+*   **Database**: Ensure both services use the same `DATABASE_URL`.
+
+## Local Development vs Production
+
+*   **Local**: Frontend talks to Vite (:5173) -> Proxy to Backend (:8000) -> Proxy to Auth (:3001).
+*   **Production**: Frontend talks to Backend (:8000) -> Proxy to Auth (:3001).
+
+No changes needed in frontend code!

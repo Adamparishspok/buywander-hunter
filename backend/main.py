@@ -6,7 +6,8 @@ from datetime import datetime, timedelta
 from typing import List, Optional
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Depends, HTTPException, status, Response
+import httpx
+from fastapi import FastAPI, Depends, HTTPException, status, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, FileResponse
@@ -283,6 +284,49 @@ async def run_scraper_task(pull_id: str, user_id: int, user_interests: dict):
 async def get_me(current_user: dict = Depends(get_current_user)):
     """Get current user info from Better Auth token."""
     return {"success": True, "user": current_user}
+
+
+@app.api_route("/api/auth/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"])
+async def proxy_auth(path: str, request: Request):
+    """Proxy requests to the Better Auth server."""
+    better_auth_url = os.getenv("BETTER_AUTH_URL", "http://localhost:3001")
+    # Ensure no trailing slash on base URL
+    better_auth_url = better_auth_url.rstrip("/")
+    
+    target_url = f"{better_auth_url}/api/auth/{path}"
+    
+    # Forward query params
+    params = dict(request.query_params)
+    
+    # Forward headers (excluding host to avoid issues)
+    headers = dict(request.headers)
+    headers.pop("host", None)
+    headers.pop("content-length", None) # Let httpx handle this
+    
+    # Forward body
+    body = await request.body()
+    
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.request(
+                method=request.method,
+                url=target_url,
+                params=params,
+                headers=headers,
+                content=body,
+                follow_redirects=False
+            )
+        except httpx.RequestError as e:
+            print(f"Auth proxy error: {e}")
+            raise HTTPException(status_code=502, detail="Auth server unavailable")
+        
+    # Create response
+    proxy_response = Response(
+        content=response.content,
+        status_code=response.status_code,
+        headers=dict(response.headers)
+    )
+    return proxy_response
 
 
 # ==================== Scraping Routes ====================
